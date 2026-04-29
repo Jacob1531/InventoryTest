@@ -1,28 +1,67 @@
-/* Global */
+/* =========================
+   THEME VARIABLES
+   ========================= */
+:root {
+    --bg-color: #f8f9fa;
+    --card-color: #ffffff;
+    --text-color: #212529;
+    --muted-color: #6c757d;
+    --border-color: #dee2e6;
+    --btn-hover: #6c757d;
+}
+
+.theme-dark {
+    --bg-color: #121212;
+    --card-color: #1e1e1e;
+    --text-color: #e9ecef;
+    --muted-color: #adb5bd;
+    --border-color: #2a2a2a;
+    --btn-hover: #495057;
+}
+
+/* =========================
+   GLOBAL STYLES
+   ========================= */
 body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Logo */
-.logo {
-    width: 140px;
-    opacity: 0.9;
+p {
+    color: var(--muted-color);
 }
 
-/* Input */
+/* =========================
+   FORM & BUTTON STYLES
+   ========================= */
 input.form-control {
+    background-color: var(--card-color);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
-    border: 1px solid #ddd;
+    color: var(--text-color);
 }
 
-/* Button */
+input.form-control::placeholder {
+    color: var(--muted-color);
+}
+
 .btn-outline-secondary {
     border-radius: 12px;
-    transition: all 0.2s ease-in-out;
+    color: var(--muted-color);
+    border-color: var(--border-color);
 }
 
 .btn-outline-secondary:hover {
-    background-color: #6c757d;
+    background-color: var(--btn-hover);
     color: white;
 }
-``
+
+/* =========================
+   LOGO
+   ========================= */
+.logo {
+    width: 210px;
+    opacity: 0.9;
+}

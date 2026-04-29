@@ -10,8 +10,28 @@
     <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='diaspora_logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
+  
+  <script>
+    const toggle = document.getElementById("theme-toggle");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
-  <body class="bg-light text-secondary">
+    // Load saved theme or system preference
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) {
+      document.body.className = savedTheme;
+    } else if (prefersDark) {
+      document.body.className = "theme-dark";
+    }
+
+    toggle.addEventListener("click", () => {
+      const isDark = document.body.classList.toggle("theme-dark");
+      document.body.classList.toggle("theme-light", !isDark);
+      localStorage.setItem("theme", document.body.className);
+      toggle.textContent = isDark ? "☀️" : "🌙";
+    });
+  </script>
+
+  <body class="theme-light">
     <main class="container min-vh-100 d-flex flex-column justify-content-center">
       <div class="text-center">
 
@@ -20,6 +40,10 @@
         <h1 class="fw-semibold text-dark mb-3">
           Diaspora Inventory System
         </h1>
+        
+        <button id="theme-toggle" class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-3" aria-label="Toggle dark mode">
+          🌙
+        </button>
 
         <p class="text-muted mb-4">
           Please enter your name to continue
