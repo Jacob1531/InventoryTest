@@ -1,0 +1,28 @@
+/* Global */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Logo */
+.logo {
+    width: 140px;
+    opacity: 0.9;
+}
+
+/* Input */
+input.form-control {
+    border-radius: 12px;
+    border: 1px solid #ddd;
+}
+
+/* Button */
+.btn-outline-secondary {
+    border-radius: 12px;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+}
+``
