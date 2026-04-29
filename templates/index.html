@@ -1,29 +1,41 @@
 <!doctype html>
-<head>
-    <title>Diaspora Inventory System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='diaspora_logo.png') }}">
-</head>
 <html>
-   <body>
-     <main>
-        <div class="px-4 py-3 my-2 text-center">
-            <img class="d-block mx-auto mb-4" src="{{ url_for('static', filename='diaspora_logo.png') }}" alt="DCS_Logo" width="256" height="192"/>
-            <h1 class="display-6 fw-bold text-primary">Welcome to Diaspora's Inventory System</h1>            
-          </div>
-        <form method="post" action="{{url_for('hello')}}">
-            <div class="col-md-6 mx-auto text-center">
-                <label for="name" class="form-label fw-bold fs-5">Could you please enter your name?</label>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-                <!-- <p class="lead mb-2">Could you please tell me your name?</p> -->
-                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center align-items-center my-1">
-                    <input type="text" class="form-control" id="name" name="name" style="max-width: 256px;">
-                  </div>            
-                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center my-2">
-                  <button type="submit" class="btn btn-primary btn-lg px-4 gap-3">Say Hello</button>
-                </div>            
-            </div>
+    <title>Diaspora Inventory System</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='diaspora_logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+
+  <body class="bg-light text-secondary">
+    <main class="container min-vh-100 d-flex flex-column justify-content-center">
+      <div class="text-center">
+
+        <img class="mb-4 logo" src="{{ url_for('static', filename='diaspora_logo.png') }}"  alt="Diaspora Logo">
+
+        <h1 class="fw-semibold text-dark mb-3">
+          Diaspora Inventory System
+        </h1>
+
+        <p class="text-muted mb-4">
+          Please enter your name to continue
+        </p>
+
+        <form method="post" action="{{ url_for('hello') }}">
+          <div class="d-flex justify-content-center mb-3">
+            <input type="text" class="form-control form-control-lg text-center" name="name" placeholder="Your name" style="max-width: 300px;">
+          </div>
+
+          <button type="submit" class="btn btn-outline-secondary btn-lg px-5">
+            Say Hello
+          </button>
         </form>
-     </main>      
-   </body>
+
+      </div>
+    </main>
+  </body>
 </html>
