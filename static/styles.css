@@ -7,7 +7,10 @@
     --text-color: #212529;
     --muted-color: #6c757d;
     --border-color: #dee2e6;
-    --btn-hover: #6c757d;
+
+    /* Brand accent */
+    --accent-color: #4c6ef5;
+    --accent-hover: #3b5bdb;
 }
 
 .theme-dark {
@@ -16,8 +19,12 @@
     --text-color: #e9ecef;
     --muted-color: #adb5bd;
     --border-color: #2a2a2a;
-    --btn-hover: #495057;
+
+    /* Same accent works in dark mode */
+    --accent-color: #748ffc;
+    --accent-hover: #5c7cfa;
 }
+
 
 /* =========================
    GLOBAL STYLES
@@ -33,6 +40,11 @@ p {
     color: var(--muted-color);
 }
 
+.brand-title {
+    color: var(--text-color);
+}
+
+
 /* =========================
    FORM & BUTTON STYLES
    ========================= */
@@ -47,6 +59,11 @@ input.form-control::placeholder {
     color: var(--muted-color);
 }
 
+input.form-control:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 0.15rem rgba(76, 110, 245, 0.25);
+}
+
 .btn-outline-secondary {
     border-radius: 12px;
     color: var(--muted-color);
@@ -56,6 +73,19 @@ input.form-control::placeholder {
 .btn-outline-secondary:hover {
     background-color: var(--btn-hover);
     color: white;
+}
+
+.btn-accent {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+    border-radius: 12px;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-accent:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
 }
 
 /* =========================
