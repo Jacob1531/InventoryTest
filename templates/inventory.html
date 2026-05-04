@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Inventory Records</h2>
+
+<ul>
+    {% for record in records %}
+        <li>{{ record }}</li>
+    {% else %}
+        <li>No records found.</li>
+    {% endfor %}
+</ul>
+
+<a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+
+{% endblock %}

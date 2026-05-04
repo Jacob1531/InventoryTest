@@ -1,0 +1,58 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+}
+
+.top-bar {
+    display: flex;
+    align-items: center;
+    background-color: #1f2937;
+    color: white;
+    padding: 15px 30px;
+}
+
+.logo img {
+    height: 40px;
+    margin-right: 20px;
+}
+
+.title h1 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.title p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.content {
+    padding: 30px;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #111827;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+}
+
+.card h2 {
+    margin-top: 0;
+}
