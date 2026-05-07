@@ -6,13 +6,14 @@ from azure.storage.blob import BlobServiceClient
 app = Flask(__name__)
 
 
+@app.route("/")
+def dashboard():
+    return "Flask is running"
+    #return render_template("dashboard.html", title="Dashboard")
+
 @app.route('/favicon.ico')
 def favicon():
     return app.send_static_file('favicon.png')
-
-@app.route("/")
-def dashboard():
-    return render_template("dashboard.html", title="Dashboard")
 
 @app.route("/inventory")
 def inventory():
