@@ -8,8 +8,8 @@ app = Flask(__name__)
 
 @app.route("/")
 def dashboard():
-    return "Flask is running"
-    #return render_template("dashboard.html", title="Dashboard")
+    #return "Flask is running"
+    return render_template("dashboard.html", title="Dashboard")
 
 @app.route('/favicon.ico')
 def favicon():
