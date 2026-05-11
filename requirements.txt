@@ -1,3 +1,7 @@
 Flask==3.1.0
 gunicorn
+sqlalchemy
+psycopg2-binary
 azure-storage-blob
+pandas
+openpyxl

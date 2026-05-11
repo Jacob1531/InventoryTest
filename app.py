@@ -3,6 +3,10 @@ import os
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for)
 from azure.storage.blob import BlobServiceClient
 
+from db import SessionLocal
+from models import Inventory
+from services.inventory_service import update_inventory_quantity
+
 app = Flask(__name__)
 
 
@@ -15,23 +19,24 @@ def dashboard():
 def favicon():
     return app.send_static_file('favicon.png')
 
-@app.route("/inventory")
+
+app.route("/inventory")
 def inventory():
-    records = list_inventory_files()
-    return render_template("inventory.html", title="Inventory", records=records)
+    db = SessionLocal()
+    items = db.query(Inventory).filter(Inventory.is_active == True).all()
+    db.close()
+    return render_template("inventory.html", items=items)
 
-def list_inventory_files():
-    connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-    container_name = "inventory"
 
-    blob_service_client = BlobServiceClient.from_connection_string(connect_str)
-    container_client = blob_service_client.get_container_client(container_name)
+@app.route("/inventory/update", methods=["POST"])
+def update_inventory():
+    item_id = request.form["item_id"]
+    new_qty = int(request.form["quantity"])
 
-    files = []
-    for blob in container_client.list_blobs():
-        files.append(blob.name)
+    update_inventory_quantity(item_id, new_qty)
 
-    return files
+    return redirect(url_for("inventory"))
+
 
 if __name__ == "__main__":
     app.run(debug=True)
