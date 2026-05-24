@@ -1,7 +1,7 @@
 import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for)
-from azure.storage.blob import BlobServiceClient
+#from azure.storage.blob import BlobServiceClient
 
 #from db import SessionLocal
 from models import Inventory
