@@ -1,9 +1,9 @@
 import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for)
-#from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient
 
-#from db import SessionLocal
+from db import SessionLocal
 from models import Inventory
 from services.inventory_update import update_inventory_quantity
 
@@ -20,16 +20,16 @@ def favicon():
     return app.send_static_file('favicon.png')
 
 
-#app.route("/inventory")
-#def inventory():
+app.route("/inventory")
+def inventory():
     db = SessionLocal()
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
     db.close()
     return render_template("inventory.html", items=items)
 
 
-#@app.route("/inventory/update", methods=["POST"])
-#def update_inventory():
+@app.route("/inventory/update", methods=["POST"])
+def update_inventory():
     item_id = request.form["item_id"]
     new_qty = int(request.form["quantity"])
 
