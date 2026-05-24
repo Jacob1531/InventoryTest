@@ -20,6 +20,15 @@ def favicon():
     return app.send_static_file('favicon.png')
 
 
+from db import engine
+from models import Base
+
+@app.route("/init-db")
+def init_db():
+    Base.metadata.create_all(engine)
+    return "Tables created!"
+
+
 @app.route("/inventory")
 def inventory():
     db = SessionLocal()
