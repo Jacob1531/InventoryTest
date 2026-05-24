@@ -5,7 +5,7 @@ from azure.storage.blob import BlobServiceClient
 
 from db import SessionLocal
 from models import Inventory
-from services.inventory_service import update_inventory_quantity
+from services.inventory_update import update_inventory_quantity
 
 app = Flask(__name__)
 
