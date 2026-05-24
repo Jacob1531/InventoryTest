@@ -20,7 +20,7 @@ def favicon():
     return app.send_static_file('favicon.png')
 
 
-app.route("/inventory")
+@app.route("/inventory")
 def inventory():
     db = SessionLocal()
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
