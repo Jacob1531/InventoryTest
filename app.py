@@ -6,6 +6,7 @@ from azure.storage.blob import BlobServiceClient
 from db import SessionLocal
 from models import Inventory
 from services.inventory_update import update_inventory_quantity
+from services.image_handler import upload_inventory_image
 
 app = Flask(__name__)
 
@@ -45,6 +46,33 @@ def update_inventory():
     update_inventory_quantity(item_id, new_qty)
 
     return redirect(url_for("inventory"))
+
+
+@app.route("/inventory/add", methods=["POST"])
+def add_inventory():
+    db = SessionLocal()
+
+    image_file = request.files.get("image")
+    image_path = None
+
+    if image_file and image_file.filename:
+        image_path = upload_inventory_image(image_file)
+
+    item = Inventory(
+        item_id=request.form["item_id"],
+        name=request.form["name"],
+        category=request.form.get("category"),
+        quantity=int(request.form["quantity"]),
+        price=request.form["price"],
+        image_blob_path=image_path
+    )
+
+    db.add(item)
+    db.commit()
+    db.close()
+
+    return redirect(url_for("inventory"))
+
 
 
 if __name__ == "__main__":
