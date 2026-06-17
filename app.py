@@ -67,6 +67,21 @@ def add_inventory():
         image_blob_path=image_path
     )
 
+    
+    if not all([item_id, name, category, quantity, price, image_file]):
+        return "Error: All fields including image are required.", 400
+
+    #checks input validity
+    try:
+        quantity = int(quantity)
+        price = float(price)
+        if quantity < 0 or price < 0:
+            return "Error: Quantity and price must be positive.", 400
+    except:
+        return "Error: Invalid numeric input.", 400
+
+
+
     db.add(item)
     db.commit()
     db.close()
