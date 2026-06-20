@@ -6,7 +6,7 @@ from azure.storage.blob import BlobServiceClient
 from db import SessionLocal
 from models import Inventory
 from services.inventory_update import update_inventory_quantity
-from services.image_handler import upload_inventory_image
+from services.image_handler import generate_image_url, upload_inventory_image
 
 app = Flask(__name__)
 
@@ -34,6 +34,15 @@ def favicon():
 def inventory():
     db = SessionLocal()
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
+
+    
+    for item in items:
+        if item.image_blob_path:
+            item.image_url = generate_image_url(item.image_blob_path)
+        else:
+            item.image_url = None
+
+
     db.close()
     return render_template("inventory.html", items=items)
 
