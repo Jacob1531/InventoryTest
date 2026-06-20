@@ -88,7 +88,7 @@ def add_inventory():
             category=category,
             quantity=quantity,
             price=price,
-            image_blob_path=image_path
+            image_blob_path=image_path,
             is_active=True
         )
 
