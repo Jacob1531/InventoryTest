@@ -52,41 +52,57 @@ def update_inventory():
 def add_inventory():
     db = SessionLocal()
 
-    image_file = request.files.get("image")
-    image_path = None
+    try:
+        #Obtains values first
+        item_id = request.form.get("item_id")
+        name = request.form.get("name")
+        category = request.form.get("category")
+        quantity = request.form.get("quantity")
+        price = request.form.get("price")
+        image_file = request.files.get("image")
 
-    if image_file and image_file.filename:
+        #Checks validity of fields
+        if not all([item_id, name, category, quantity, price, image_file]):
+            return "Error: All fields including image are required.", 400
+
+        #Checks numbers being valid
+        try:
+            quantity = int(quantity)
+            price = float(price)
+
+            if quantity < 0 or price < 0:
+                return "Error: Quantity and price must be positive.", 400
+
+        except:
+            return "Error: Invalid numeric input.", 400
+
+        #Validates image type
+        if not image_file.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+            return "Error: Only PNG/JPG images allowed.", 400
+
+        #uploads only after image passes check
         image_path = upload_inventory_image(image_file)
 
-    item = Inventory(
-        item_id=request.form["item_id"],
-        name=request.form["name"],
-        category=request.form.get("category"),
-        quantity=int(request.form["quantity"]),
-        price=request.form["price"],
-        image_blob_path=image_path
-    )
+        item = Inventory(
+            item_id=item_id,
+            name=name,
+            category=category,
+            quantity=quantity,
+            price=price,
+            image_blob_path=image_path
+        )
 
-    
-    if not all([item_id, name, category, quantity, price, image_file]):
-        return "Error: All fields including image are required.", 400
+        db.add(item)
+        db.commit()
 
-    #checks input validity
-    try:
-        quantity = int(quantity)
-        price = float(price)
-        if quantity < 0 or price < 0:
-            return "Error: Quantity and price must be positive.", 400
-    except:
-        return "Error: Invalid numeric input.", 400
+        return redirect(url_for("inventory"))
 
+    except Exception as e:
+        db.rollback()
+        return f"Server error: {str(e)}", 500
 
-
-    db.add(item)
-    db.commit()
-    db.close()
-
-    return redirect(url_for("inventory"))
+    finally:
+        db.close()
 
 
 
