@@ -89,6 +89,7 @@ def add_inventory():
             quantity=quantity,
             price=price,
             image_blob_path=image_path
+            is_active=True
         )
 
         db.add(item)
