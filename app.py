@@ -51,10 +51,10 @@ def update_inventory():
 @app.route("/inventory/add", methods=["POST"])
 def add_inventory():
     db = SessionLocal()
-
+    #Will likely makle price optional. Also need to eventually do checks against the db
+    #to ensure unique entries and no duplicates
     try:
         #Obtains values first
-        item_id = request.form.get("item_id")
         name = request.form.get("name")
         category = request.form.get("category")
         quantity = request.form.get("quantity")
@@ -62,7 +62,7 @@ def add_inventory():
         image_file = request.files.get("image")
 
         #Checks validity of fields
-        if not all([item_id, name, category, quantity, price, image_file]):
+        if not all([name, category, quantity, price, image_file]):
             return "Error: All fields including image are required.", 400
 
         #Checks numbers being valid
@@ -84,7 +84,6 @@ def add_inventory():
         image_path = upload_inventory_image(image_file)
 
         item = Inventory(
-            item_id=item_id,
             name=name,
             category=category,
             quantity=quantity,
@@ -104,7 +103,25 @@ def add_inventory():
     finally:
         db.close()
 
+#for debug purposes. Wont exist for deployment
+@app.route("/debug-db")
+def debug_db():
+    db = SessionLocal()
+    items = db.query(Inventory).all()
 
+    output = []
+    for item in items:
+        output.append({
+            "id": item.id,
+            "name": item.name,
+            "category": item.category,
+            "quantity": item.quantity,
+            "price": str(item.price),
+            "image": item.image_blob_path
+        })
+
+    db.close()
+    return {"items": output}
 
 if __name__ == "__main__":
     app.run(debug=True)

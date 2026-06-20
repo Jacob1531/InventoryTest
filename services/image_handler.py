@@ -2,10 +2,10 @@ from azure.storage.blob import BlobServiceClient
 import os
 import uuid
 
-CONNECT_STR = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 CONTAINER = "inventory-images"
 
 def upload_inventory_image(file):
+    CONNECT_STR = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
     blob_service = BlobServiceClient.from_connection_string(CONNECT_STR)
     container_client = blob_service.get_container_client(CONTAINER)
 
