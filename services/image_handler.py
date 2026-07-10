@@ -24,13 +24,13 @@ def generate_image_url(blob_path):
     return f"https://{account_name}.blob.core.windows.net/inventory-images/{blob_path}?{sas_token}"
 
 def upload_inventory_image(file):
-    CONNECT_STR = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 
     if not connect_str:
         raise Exception("Missing AZURE_STORAGE_CONNECTION_STRING")
 
 
-    blob_service = BlobServiceClient.from_connection_string(CONNECT_STR)
+    blob_service = BlobServiceClient.from_connection_string(connect_str)
     container_client = blob_service.get_container_client(CONTAINER)
 
     filename = f"{uuid.uuid4()}_{file.filename}"
