@@ -14,7 +14,7 @@
     <tr>
         <td>
             {% if item.image_url %}
-                {{ item.image_url }}
+               <img src="{{ item.image_url }}" width="80" alt="{{ item.name }}">
             {% else %}
                 <span>No image</span>
             {% endif %}
