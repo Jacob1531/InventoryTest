@@ -113,6 +113,35 @@ def add_inventory():
     finally:
         db.close()
 
+
+@app.route("/inventory/delete/<int:item_id>", methods=["POST"])
+def delete_inventory(item_id):
+    db = SessionLocal()
+
+    try:
+        item = db.query(Inventory).filter(
+            Inventory.id == item_id
+        ).first()
+
+        if not item:
+            return "Item not found", 404
+
+        # Soft delete
+        item.is_active = False
+
+        
+        db.commit()
+
+        return redirect(url_for("inventory"))
+
+    except Exception as e:
+        db.rollback()
+        return f"Delete failed: {str(e)}", 500
+
+    finally:
+        db.close()
+
+
 #for debug purposes. Wont exist for deployment
 @app.route("/debug-db")
 def debug_db():

@@ -56,3 +56,19 @@ body {
 .card h2 {
     margin-top: 0;
 }
+
+.delete-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background-color: #2563eb;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.delete-btn:hover {
+    background-color: #1d4ed8;
+}
