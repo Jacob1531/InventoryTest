@@ -56,6 +56,8 @@ def update_inventory():
 
     return redirect(url_for("inventory"))
 
+@app.route("/inventory/update/<int:item_id>", methods=["POST"])
+def update_inventory(item_id):
 
 @app.route("/inventory/add", methods=["POST"])
 def add_inventory():
@@ -155,8 +157,9 @@ def debug_db():
             "name": item.name,
             "category": item.category,
             "quantity": item.quantity,
-            "price": str(item.price),
-            "image": item.image_blob_path
+            "price": item.price,
+            "image": item.image_blob_path,
+            "is_active": item.is_active
         })
 
     db.close()

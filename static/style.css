@@ -1,10 +1,12 @@
-body {
+body 
+{
     margin: 0;
     font-family: Arial, sans-serif;
     background-color: #f4f6f9;
 }
 
-.top-bar {
+.top-bar 
+{
     display: flex;
     align-items: center;
     background-color: #1f2937;
@@ -12,33 +14,39 @@ body {
     padding: 15px 30px;
 }
 
-.logo img {
+.logo img 
+{
     height: 40px;
     margin-right: 20px;
 }
 
-.title h1 {
+.title h1 
+{
     margin: 0;
     font-size: 22px;
 }
 
-.title p {
+.title p 
+{
     margin: 2px 0 0;
     font-size: 12px;
     opacity: 0.8;
 }
 
-.content {
+.content 
+{
     padding: 30px;
 }
 
-.dashboard-grid {
+.dashboard-grid 
+{
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 20px;
 }
 
-.card {
+.card 
+{
     background: white;
     padding: 25px;
     border-radius: 10px;
@@ -48,16 +56,19 @@ body {
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.card:hover {
+.card:hover 
+{
     transform: translateY(-4px);
     box-shadow: 0 10px 20px rgba(0,0,0,0.12);
 }
 
-.card h2 {
+.card h2 
+{
     margin-top: 0;
 }
 
-.delete-btn {
+.delete-btn 
+{
     width: 30px;
     height: 30px;
     border-radius: 50%;
@@ -69,6 +80,42 @@ body {
     cursor: pointer;
 }
 
-.delete-btn:hover {
+.delete-btn:hover 
+{
     background-color: #1d4ed8;
+}
+
+.modal 
+{
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+}
+
+.modal-content 
+{
+    background: white;
+    width: 500px;
+    padding: 20px;
+    margin: 10% auto;
+    border-radius: 10px;
+}
+
+.close 
+{
+    float: right;
+    cursor: pointer;
+    font-size: 24px;
+}
+
+.edit-btn 
+{
+    background: #059669;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 4px;
 }
