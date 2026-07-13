@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Inventory Change History</h2>
+
+<table>
+    <tr>
+        <th>Date/Time</th>
+        <th>Item</th>
+        <th>Action</th>
+        <th>Field</th>
+        <th>Old Value</th>
+        <th>New Value</th>
+        <th>Changed By</th>
+        <th>Source</th>
+    </tr>
+
+    {% for log in logs %}
+    <tr>
+        <td>{{ log.changed_at.strftime("%Y-%m-%d %H:%M") if log.changed_at else "" }}</td>
+        <td>{{ log.item_name }}</td>
+        <td>{{ log.action }}</td>
+        <td>{{ log.field_name or "-" }}</td>
+        <td>{{ log.old_value or "-" }}</td>
+        <td>{{ log.new_value or "-" }}</td>
+        <td>{{ log.changed_by }}</td>
+        <td>{{ log.source }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+{% endblock %}

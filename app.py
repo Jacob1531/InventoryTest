@@ -4,9 +4,11 @@ from flask import (Flask, redirect, render_template, request, send_from_director
 from azure.storage.blob import BlobServiceClient
 
 from db import SessionLocal
-from models import Inventory
+from models import Inventory, InventoryAudit
 from services.inventory_update import update_inventory_quantity
 from services.image_handler import generate_image_url, upload_inventory_image
+
+from auth import get_user
 
 app = Flask(__name__)
 
@@ -49,10 +51,10 @@ def inventory():
 
 @app.route("/inventory/update", methods=["POST"])
 def update_inventory():
-    item_id = request.form["item_id"]
+    id = request.form["id"]
     new_qty = int(request.form["quantity"])
 
-    update_inventory_quantity(item_id, new_qty)
+    update_inventory_quantity(id, new_qty)
     return redirect(url_for("inventory"))
 
 @app.route("/inventory/edit/<int:item_id>", methods=["POST"])
@@ -60,28 +62,63 @@ def edit_inventory_item(item_id):
     db = SessionLocal()
     try:
         item = db.query(Inventory).filter(Inventory.id == item_id).first()
-
         if not item:
             return "Item not found", 404
-        if not item.name:
+        
+        new_name = request.form.get("name")
+        new_category = request.form.get("category")
+        new_quantity = int(request.form.get("quantity"))
+        new_price = float(request.form.get("price"))
+
+        if not new_name:
             return "Name is required", 400
-        if not item.category:
+        if not new_category:
             return "Category is required", 400
-        if item.quantity < 0:
+        
+        try:
+            new_quantity = int(new_quantity)
+            new_price = float(new_price)
+        except:
+            return "Invalid numeric input", 400
+
+        if new_quantity < 0:
             return "Quantity can't be negative", 400
-        if item.price < 0.01:
+        if new_price < 0.01:
             return "Price must be positive", 400
+        
+        changes = []
+        if item.name != new_name:
+            changes.append(("name", item.name, new_name))
+        if item.category != new_category:
+            changes.append(("category", item.category, new_category))
+        if item.quantity != new_quantity:
+            changes.append(("quantity", str(item.quantity), str(new_quantity)))
+        if float(item.price) != new_price:
+            changes.append(("price", str(item.price), str(new_price)))
 
+        item.name = new_name
+        item.category = new_category
+        item.quantity = new_quantity
+        item.price = new_price
 
-        item.name = request.form.get("name")
-        item.category = request.form.get("category")
-        item.quantity = int(request.form.get("quantity"))
-        item.price = float(request.form.get("price"))
         image_file = request.files.get("image")
 
         if image_file and image_file.filename:
             image_path = upload_inventory_image(image_file)
             item.image_blob_path = image_path
+            changes.append(("image", "previous image", "new image"))
+
+        for field_name, old_value, new_value in changes:
+            audit = InventoryAudit(
+                item_id=str(item.id),
+                action="UPDATE",
+                field_name=field_name,
+                old_value=old_value,
+                new_value=new_value,
+                changed_by=get_user(),
+                source="UI"
+            )
+            db.add(audit)
 
         db.commit()
         return redirect(url_for("inventory"))
@@ -139,6 +176,19 @@ def add_inventory():
         )
 
         db.add(item)
+        db.flush()  # populates item.id before commit, needed for the audit entry below
+
+        audit = InventoryAudit(
+            item_id=str(item.id),
+            action="ADD",
+            field_name=None,
+            old_value=None,
+            new_value=name,
+            changed_by=get_user(),
+            source="UI"
+        )
+
+        db.add(audit)
         db.commit()
 
         return redirect(url_for("inventory"))
@@ -156,9 +206,7 @@ def delete_inventory(item_id):
     db = SessionLocal()
 
     try:
-        item = db.query(Inventory).filter(
-            Inventory.id == item_id
-        ).first()
+        item = db.query(Inventory).filter(Inventory.id == item_id).first()
 
         if not item:
             return "Item not found", 404
@@ -166,6 +214,16 @@ def delete_inventory(item_id):
         # Soft delete
         item.is_active = False
 
+        audit = InventoryAudit(
+            item_id=str(item.id),
+            action="DELETE",
+            field_name="is_active",
+            old_value="True",
+            new_value="False",
+            changed_by=get_user(),
+            source="UI"
+        )
+        db.add(audit)
         
         db.commit()
 
@@ -178,6 +236,22 @@ def delete_inventory(item_id):
     finally:
         db.close()
 
+@app.route("/reports")
+def reports():
+    db = SessionLocal()
+    logs = db.query(InventoryAudit).order_by(InventoryAudit.changed_at.desc()).all()
+
+    # Map item_id -> item name for display
+    item_names = {
+        str(item.id): item.name
+        for item in db.query(Inventory).all()
+    }
+
+    for log in logs:
+        log.item_name = item_names.get(log.item_id, log.item_id)
+
+    db.close()
+    return render_template("reports.html", logs=logs)
 
 #for debug purposes. Wont exist for deployment
 @app.route("/debug-db")

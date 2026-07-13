@@ -6,7 +6,7 @@ def update_inventory_quantity(item_id, new_qty, source="UI"):
     db = SessionLocal()
 
     item = db.query(Inventory).filter(
-        Inventory.item_id == item_id,
+        Inventory.id == item_id,
         Inventory.is_active == True
     ).first()
 
@@ -18,7 +18,7 @@ def update_inventory_quantity(item_id, new_qty, source="UI"):
     item.quantity = new_qty
 
     audit = InventoryAudit(
-        item_id=item.item_id,
+        item_id=str(item.id),
         action="UPDATE",
         field_name="quantity",
         old_value=str(old_qty),
