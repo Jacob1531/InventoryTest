@@ -57,7 +57,7 @@ function filterReports()
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const matchesSearch = text.includes(searchInput);
-        const matchesAction = actionInput === "All Actions" || row.dataset.action.toUpperCase() === actionInput.toUpperCase();
+        const matchesAction = actionInput === "" || row.dataset.action.toUpperCase() === actionInput.toUpperCase();
         const isVisible = matchesSearch && matchesAction;
 
         row.style.display = isVisible ? "" : "none";
