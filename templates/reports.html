@@ -3,31 +3,69 @@
 
 <h2>Inventory Change History</h2>
 
-<table>
-    <tr>
-        <th>Date/Time</th>
-        <th>Item</th>
-        <th>Action</th>
-        <th>Field</th>
-        <th>Old Value</th>
-        <th>New Value</th>
-        <th>Changed By</th>
-        <th>Source</th>
-    </tr>
+<div class="filters"></div>
+    <input type="text" id="reportSearch" placeholder="Search by item, action, user..." onkeyup="filterReports()" class="search-box">
+    <select id="actionFilter" onchange="filterReports()" class="action-filter">
+        <option value="">All Actions</option>
+        <option value="ADD">Add</option>
+        <option value="UPDATE">Update</option>
+        <option value="DELETE">Delete</option>
+    </select>
+</div>
 
-    {% for log in logs %}
-    <tr>
-        <td>{{ log.changed_at.strftime("%Y-%m-%d %H:%M") if log.changed_at else "" }}</td>
-        <td>{{ log.item_name }}</td>
-        <td>{{ log.action }}</td>
-        <td>{{ log.field_name or "-" }}</td>
-        <td>{{ log.old_value or "-" }}</td>
-        <td>{{ log.new_value or "-" }}</td>
-        <td>{{ log.changed_by }}</td>
-        <td>{{ log.source }}</td>
-    </tr>
-    {% endfor %}
+<table id="reportsTable" class="reports-table">
+    <thead>
+        <tr>
+            <th>Date/Time</th>
+            <th>Item</th>
+            <th>Action</th>
+            <th>Field</th>
+            <th>Old Value</th>
+            <th>New Value</th>
+            <th>Changed By</th>
+            <th>Source</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in logs %}
+        <tr>
+            <td>{{ log.changed_at.strftime("%Y-%m-%d %H:%M") if log.changed_at else "" }}</td>
+            <td>{{ log.item_name }}</td>
+            <td>{{ log.action }}</td>
+            <td>{{ log.field_name or "-" }}</td>
+            <td>{{ log.old_value or "-" }}</td>
+            <td>{{ log.new_value or "-" }}</td>
+            <td>{{ log.changed_by }}</td>
+            <td>{{ log.source }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
 </table>
 
+<p id="noResults" style="display:none;">No matching results.</p>
+
 <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+
+<script>
+function filterReports() 
+{
+    const searchInput = document.getElementById("reportSearch").value.toLowerCase();
+    const actionInput = document.getElementById("actionFilter").value;
+    const rows = document.querySelectorAll("#reportsTable tbody tr");
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const matchesSearch = text.includes(searchInput);
+        const matchesAction = actionInput === "" || row.dataset.action === actionInput;
+        const isVisible = matchesSearch && matchesAction;
+
+        row.style.display = isVisible ? "" : "none";
+        if (isVisible) visibleCount++;
+    });
+
+    document.getElementById("noResults").style.display = visibleCount === 0 ? "block" : "none";
+}
+</script>
+
 {% endblock %}
