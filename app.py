@@ -53,11 +53,46 @@ def update_inventory():
     new_qty = int(request.form["quantity"])
 
     update_inventory_quantity(item_id, new_qty)
-
     return redirect(url_for("inventory"))
 
-@app.route("/inventory/update/<int:item_id>", methods=["POST"])
-def update_inventory(item_id):
+@app.route("/inventory/edit/<int:item_id>", methods=["POST"])
+def edit_inventory_item(item_id):
+    db = SessionLocal()
+    try:
+        item = db.query(Inventory).filter(Inventory.id == item_id).first()
+
+        if not item:
+            return "Item not found", 404
+        if not item.name:
+            return "Name is required", 400
+        if not item.category:
+            return "Category is required", 400
+        if item.quantity < 0:
+            return "Quantity can't be negative", 400
+        if item.price < 0.01:
+            return "Price must be positive", 400
+
+
+        item.name = request.form.get("name")
+        item.category = request.form.get("category")
+        item.quantity = int(request.form.get("quantity"))
+        item.price = float(request.form.get("price"))
+        image_file = request.files.get("image")
+
+        if image_file and image_file.filename:
+            image_path = upload_inventory_image(image_file)
+            item.image_blob_path = image_path
+
+        db.commit()
+        return redirect(url_for("inventory"))
+
+    except Exception as e:
+        db.rollback()
+        return f"Update failed: {str(e)}", 500
+
+    finally:
+        db.close()
+
 
 @app.route("/inventory/add", methods=["POST"])
 def add_inventory():
