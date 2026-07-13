@@ -50,7 +50,7 @@
 function filterReports() 
 {
     const searchInput = document.getElementById("reportSearch").value.toLowerCase();
-    const actionInput = document.getElementById("actionFilter").value;
+    const actionInput = document.getElementById("actionFilter").value.toUpperCase;
     const rows = document.querySelectorAll("#reportsTable tbody tr");
     let visibleCount = 0;
 
