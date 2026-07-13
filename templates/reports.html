@@ -3,7 +3,7 @@
 
 <h2>Inventory Change History</h2>
 
-<div class="filters"></div>
+<div class="filters">
     <input type="text" id="reportSearch" placeholder="Search by item, action, user..." onkeyup="filterReports()" class="search-box">
     <select id="actionFilter" onchange="filterReports()" class="action-filter">
         <option value="">All Actions</option>
@@ -28,7 +28,7 @@
     </thead>
     <tbody>
         {% for log in logs %}
-        <tr>
+        <tr data-action="{{ log.action }}">
             <td>{{ log.changed_at.strftime("%Y-%m-%d %H:%M") if log.changed_at else "" }}</td>
             <td>{{ log.item_name }}</td>
             <td>{{ log.action }}</td>
