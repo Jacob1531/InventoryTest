@@ -50,14 +50,14 @@
 function filterReports() 
 {
     const searchInput = document.getElementById("reportSearch").value.toLowerCase();
-    const actionInput = document.getElementById("actionFilter").value.toUpperCase;
+    const actionInput = document.getElementById("actionFilter").value;
     const rows = document.querySelectorAll("#reportsTable tbody tr");
     let visibleCount = 0;
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const matchesSearch = text.includes(searchInput);
-        const matchesAction = actionInput === "" || row.dataset.action === actionInput;
+        const matchesAction = actionInput === "" || row.dataset.action.toUpperCase() === actionInput.toUpperCase();
         const isVisible = matchesSearch && matchesAction;
 
         row.style.display = isVisible ? "" : "none";
