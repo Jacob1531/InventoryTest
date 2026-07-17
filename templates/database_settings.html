@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Database Settings</h2>
+<p>Set a low-stock threshold for each item. When an item's quantity drops below this value, an email alert is sent to the configured Entra group.</p>
+
+<table class="reports-table">
+    <tr>
+        <th>Item</th>
+        <th>Current Quantity</th>
+        <th>Low Stock Threshold</th>
+        <th></th>
+    </tr>
+    {% for item in items %}
+    <tr>
+        <td>{{ item.name }}</td>
+        <td>{{ item.quantity }}</td>
+        <td>
+            <form method="POST" action="{{ url_for('update_threshold', item_id=item.id) }}" style="display:flex; gap:8px;">
+                <input type="number" name="threshold" min="0"
+                       value="{{ item.low_stock_threshold if item.low_stock_threshold is not none else '' }}"
+                       style="width:80px;">
+                <button type="submit">Save</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<a href="{{ url_for('settings') }}">← Back to Settings</a>
+{% endblock %}

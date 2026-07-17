@@ -9,6 +9,7 @@ from services.inventory_update import update_inventory_quantity
 from services.image_handler import generate_image_url, upload_inventory_image
 
 from auth import get_user
+from services.notifications import send_low_stock_email
 
 app = Flask(__name__)
 
@@ -86,6 +87,8 @@ def edit_inventory_item(item_id):
         if new_price < 0.01:
             return "Price must be positive", 400
         
+        old_quantity = item.quantity
+
         changes = []
         if item.name != new_name:
             changes.append(("name", item.name, new_name))
@@ -119,6 +122,18 @@ def edit_inventory_item(item_id):
                 source="UI"
             )
             db.add(audit)
+        
+        crossed_threshold = (
+            item.low_stock_threshold is not None
+            and old_quantity >= item.low_stock_threshold
+            and new_quantity < item.low_stock_threshold
+        )
+
+        if crossed_threshold:
+            try:
+                send_low_stock_email(item)
+            except Exception as e:
+                print(f"Low stock email failed: {e}")
 
         db.commit()
         return redirect(url_for("inventory"))
@@ -277,7 +292,42 @@ def debug_db():
 if __name__ == "__main__":
     app.run(debug=True)
 
+@app.route("/settings")
+def settings():
+    return render_template("settings.html")
 
+
+@app.route("/settings/database")
+def database_settings():
+    db = SessionLocal()
+    items = db.query(Inventory).filter(Inventory.is_active == True).all()
+    db.close()
+    return render_template("database_settings.html", items=items)
+
+
+@app.route("/settings/database/update/<int:item_id>", methods=["POST"])
+def update_threshold(item_id):
+    db = SessionLocal()
+    try:
+        item = db.query(Inventory).filter(Inventory.id == item_id).first()
+        if not item:
+            return "Item not found", 404
+
+        threshold = request.form.get("threshold")
+        item.low_stock_threshold = int(threshold) if threshold else None
+
+        db.commit()
+        return redirect(url_for("database_settings"))
+    except Exception as e:
+        db.rollback()
+        return f"Failed to update threshold: {str(e)}", 500
+    finally:
+        db.close()
+
+
+@app.route("/settings/account")
+def account_settings():
+    return render_template("account_settings.html")
 
 
 

@@ -1,6 +1,7 @@
 from models import Inventory, InventoryAudit
 from auth import get_user
 from db import SessionLocal
+from services.notifications import send_low_stock_email
 
 def update_inventory_quantity(item_id, new_qty, source="UI"):
     db = SessionLocal()
@@ -28,5 +29,18 @@ def update_inventory_quantity(item_id, new_qty, source="UI"):
     )
 
     db.add(audit)
+
+    crossed_threshold = (
+        item.low_stock_threshold is not None
+        and old_qty >= item.low_stock_threshold
+        and new_qty < item.low_stock_threshold
+    )
+
     db.commit()
     db.close()
+
+    if crossed_threshold:
+        try:
+            send_low_stock_email(item)
+        except Exception as e:
+            print(f"Low stock email failed: {e}")

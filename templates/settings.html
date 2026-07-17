@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="dashboard-grid">
+    <a href="{{ url_for('database_settings') }}" class="card">
+        <h2>Database Settings</h2>
+        <p>Configure low-stock thresholds</p>
+    </a>
+
+    <a href="{{ url_for('account_settings') }}" class="card">
+        <h2>Account Settings</h2>
+        <p>Coming soon</p>
+    </a>
+</div>
+
+<a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+{% endblock %}
