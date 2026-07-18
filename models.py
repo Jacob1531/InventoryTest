@@ -14,7 +14,7 @@ class Inventory(Base):
     price = Column(Numeric)
     image_blob_path = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
-    low_stock_threshold = Column(Integer, nullable=True)
+    #low_stock_threshold = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 
