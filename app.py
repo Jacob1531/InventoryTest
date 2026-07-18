@@ -291,7 +291,7 @@ def debug_db():
             "name": item.name,
             "category": item.category,
             "quantity": item.quantity,
-            "low_stock_threshold": item.low_stock_threshold
+            "low_stock_threshold": item.low_stock_threshold,
             "price": item.price,
             "image": item.image_blob_path,
             "is_active": item.is_active
