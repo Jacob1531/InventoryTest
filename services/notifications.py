@@ -13,11 +13,7 @@ GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
 
 def _get_graph_token():
     authority = f"https://login.microsoftonline.com/{TENANT_ID}"
-    app = msal.ConfidentialClientApplication(
-        CLIENT_ID,
-        authority=authority,
-        client_credential=CLIENT_SECRET
-    )
+    app = msal.ConfidentialClientApplication(CLIENT_ID, authority=authority, client_credential=CLIENT_SECRET)
     result = app.acquire_token_for_client(scopes=GRAPH_SCOPE)
 
     if "access_token" not in result:
@@ -73,10 +69,7 @@ def send_low_stock_email(item):
     }
 
     url = f"https://graph.microsoft.com/v1.0/users/{SENDER_EMAIL}/sendMail"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     resp = requests.post(url, headers=headers, json=message)
     resp.raise_for_status()
