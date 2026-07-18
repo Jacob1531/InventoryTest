@@ -2,8 +2,9 @@ import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for)
 from azure.storage.blob import BlobServiceClient
+from sqlalchemy import text
 
-from db import SessionLocal
+from db import SessionLocal, engine
 from models import Inventory, InventoryAudit
 from services.inventory_update import update_inventory_quantity
 from services.image_handler import generate_image_url, upload_inventory_image
@@ -31,6 +32,14 @@ def favicon():
 #def init_db():
     #Base.metadata.create_all(engine)
     #return "Tables created!"
+
+#can be used as a one time db migration when needed as a workaround
+@app.route("/run-migration-once")
+def run_migration_once():
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE inventory ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER"))
+        conn.commit()
+    return "Migration applied"
 
 
 @app.route("/inventory")
