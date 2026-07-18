@@ -34,12 +34,12 @@ def favicon():
     #return "Tables created!"
 
 #can be used as a one time db migration when needed as a workaround
-@app.route("/run-migration-once")
-def run_migration_once():
-    with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE inventory ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER"))
-        conn.commit()
-    return "Migration applied"
+#@app.route("/run-migration-once")
+#def run_migration_once():
+#    with engine.connect() as conn:
+#        conn.execute(text("ALTER TABLE inventory ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER"))
+#        conn.commit()
+#    return "Migration applied"
 
 
 @app.route("/inventory")
