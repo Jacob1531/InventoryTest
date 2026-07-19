@@ -7,3 +7,6 @@ pandas
 openpyxl
 msal
 requests
+azure-identity
+azure-keyvault-secrets
+cryptography
