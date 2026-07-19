@@ -30,7 +30,7 @@ ENTRA / EXCHANGE PREREQUISITES (already configured):
   - ApplicationAccessPolicy:     restricts this app to send ONLY as the
                                  shared mailbox above (RestrictAccess)
 
-REQUIRED ENVIRONMENT VARIABLES:
+REQUIRED ENVIRONMENT VARIABLES (already configured):
   ENTRA_TENANT_ID              Directory (tenant) ID from the app Overview page
   ENTRA_CLIENT_ID              Application (client) ID from the app Overview page
   KEY_VAULT_URL                e.g. https://<your-vault-name>.vault.azure.net/
@@ -67,6 +67,8 @@ CLIENT_ID = os.getenv("ENTRA_CLIENT_ID")
 CLIENT_SECRET = os.getenv("ENTRA_CLIENT_SECRET")
 GROUP_ID = os.getenv("ENTRA_LOW_STOCK_GROUP_ID")
 SENDER_EMAIL = os.getenv("NOTIFICATION_SENDER_EMAIL")
+KEY_VAULT_URL = os.getenv("KEY_VAULT_URL")        # https://<vault>.vault.azure.net/
+CERT_NAME = os.getenv("CERT_NAME")                # certificate name in Key Vault
 
 # ".default" tells Entra to issue a token carrying ALL application permissions that have been granted + admin-consented on the app registration.
 GRAPH_SCOPE = ["https://graph.microsoft.com/.default"]
