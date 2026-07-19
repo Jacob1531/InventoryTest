@@ -39,8 +39,8 @@ def update_inventory_quantity(item_id, new_qty, source="UI"):
     db.commit()
     db.close()
 
-    #if crossed_threshold:
-    #    try:
-    #        send_low_stock_email(item)
-    #    except Exception as e:
-    #        print(f"Low stock email failed: {e}")
+    if crossed_threshold:
+        try:
+            send_low_stock_email(item)
+        except Exception as e:
+            print(f"Low stock email failed: {e}")

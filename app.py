@@ -8,9 +8,9 @@ from db import SessionLocal, engine
 from models import Inventory, InventoryAudit
 from services.inventory_update import update_inventory_quantity
 from services.image_handler import generate_image_url, upload_inventory_image
+from services.notifications import send_low_stock_email
 
 from auth import get_user
-#from services.notifications import send_low_stock_email
 
 app = Flask(__name__)
 
@@ -148,11 +148,11 @@ def edit_inventory_item(item_id):
             and new_quantity < item.low_stock_threshold
         )
 
-        #if crossed_threshold:
-        #    try:
-        #        send_low_stock_email(item)
-        #    except Exception as e:
-        #        print(f"Low stock email failed: {e}")
+        if crossed_threshold:
+            try:
+                send_low_stock_email(item)
+            except Exception as e:
+                print(f"Low stock email failed: {e}")
 
         db.commit()
         return redirect(url_for("inventory"))
