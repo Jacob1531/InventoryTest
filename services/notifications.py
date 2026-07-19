@@ -52,6 +52,7 @@ import requests
 import msal
 import base64
 import logging
+import time
 
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
