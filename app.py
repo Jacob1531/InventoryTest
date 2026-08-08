@@ -1,6 +1,7 @@
 import os
 
 from flask import (Flask, redirect, render_template, request, send_from_directory, url_for)
+from flask_wtf.csrf import CSRFProtect
 from azure.storage.blob import BlobServiceClient
 from sqlalchemy import text
 
@@ -13,6 +14,10 @@ from services.notifications import send_low_stock_email
 from auth import get_user
 
 app = Flask(__name__)
+
+# Required for CSRF token signing. Set FLASK_SECRET_KEY in the Azure App
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
+csrf = CSRFProtect(app)
 
 
 @app.route("/")

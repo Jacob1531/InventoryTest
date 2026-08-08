@@ -17,6 +17,7 @@
         <td>{{ item.quantity }}</td>
         <td>
             <form method="POST" action="{{ url_for('update_threshold', item_id=item.id) }}" style="display:flex; gap:8px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="number" name="threshold" min="0"
                        value="{{ item.low_stock_threshold if item.low_stock_threshold is not none else '' }}"
                        style="width:80px;">
