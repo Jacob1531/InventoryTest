@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Account Settings</h2>
-<p>Coming soon.</p>
-<a href="{{ url_for('settings') }}">← Back to Settings</a>
+
+<div class="page-header">
+    <div>
+        <h2>Account Settings</h2>
+        <p class="page-subtitle">Coming soon.</p>
+    </div>
+</div>
+
+<div class="empty-state">Account settings will appear here once available.</div>
+
+<a href="{{ url_for('settings') }}" class="back-link">← Back to Settings</a>
 {% endblock %}

@@ -16,6 +16,7 @@ from auth import get_user
 app = Flask(__name__)
 
 # Required for CSRF token signing. Set FLASK_SECRET_KEY in the Azure App
+# Service configuration (same place as PGUSER/PGPASSWORD/etc).
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 csrf = CSRFProtect(app)
 

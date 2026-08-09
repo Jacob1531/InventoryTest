@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>Inventory Change History</h2>
+<div class="page-header">
+    <div>
+        <h2>Inventory Change History</h2>
+        <p class="page-subtitle">A record of every add, update, and delete made to inventory.</p>
+    </div>
+</div>
 
 <div class="filters">
     <input type="text" id="reportSearch" placeholder="Search by item, action, user..." onkeyup="filterReports()" class="search-box">
@@ -13,41 +18,44 @@
     </select>
 </div>
 
-<table id="reportsTable" class="reports-table">
-    <thead>
-        <tr>
-            <th>Date/Time</th>
-            <th>Item</th>
-            <th>Action</th>
-            <th>Field</th>
-            <th>Old Value</th>
-            <th>New Value</th>
-            <th>Changed By</th>
-            <th>Source</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for log in logs %}
-        <tr data-action="{{ log.action }}">
-            <td>{{ log.changed_at.strftime("%Y-%m-%d %H:%M") if log.changed_at else "" }}</td>
-            <td>{{ log.item_name }}</td>
-            <td>{{ log.action }}</td>
-            <td>{{ log.field_name or "-" }}</td>
-            <td>{{ log.old_value or "-" }}</td>
-            <td>{{ log.new_value or "-" }}</td>
-            <td>{{ log.changed_by }}</td>
-            <td>{{ log.source }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="table-wrap">
+    <table id="reportsTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Date/Time</th>
+                <th>Item</th>
+                <th>Action</th>
+                <th>Field</th>
+                <th>Old Value</th>
+                <th>New Value</th>
+                <th>Changed By</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr data-action="{{ log.action }}">
+                <td>{{ log.changed_at.strftime("%Y-%m-%d %H:%M") if log.changed_at else "" }}</td>
+                <td>{{ log.item_name }}</td>
+                <td>
+                    <span class="badge badge-{{ log.action|lower }}">{{ log.action }}</span>
+                </td>
+                <td>{{ log.field_name or "-" }}</td>
+                <td>{{ log.old_value or "-" }}</td>
+                <td>{{ log.new_value or "-" }}</td>
+                <td>{{ log.changed_by }}</td>
+                <td>{{ log.source }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p id="noResults" class="no-results" style="display:none;">No matching results.</p>
+</div>
 
-<p id="noResults" style="display:none;">No matching results.</p>
-
-<a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+<a href="{{ url_for('dashboard') }}" class="back-link">← Back to Dashboard</a>
 
 <script>
-function filterReports() 
+function filterReports()
 {
     const searchInput = document.getElementById("reportSearch").value.toLowerCase();
     const actionInput = document.getElementById("actionFilter").value;
