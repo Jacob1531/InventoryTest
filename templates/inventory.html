@@ -10,10 +10,20 @@
 
 <div class="inventory-toolbar">
     <span class="inventory-count">{{ items|length }} item{{ 's' if items|length != 1 else '' }}</span>
+    <div class="inventory-toolbar-actions">
+        <button type="button" class="btn btn-secondary" id="sortToggleBtn" onclick="toggleInventorySort()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h9M3 18h6"/><path d="M17 4v14M17 4l-3 3M17 4l3 3"/></svg>
+            Sort A–Z
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="exportInventoryToExcel('inventoryGrid', 'inventory.xlsx')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export to Excel
+        </button>
+    </div>
 </div>
 
 {% if items %}
-<div class="inventory-grid">
+<div class="inventory-grid" id="inventoryGrid">
     {% for item in items %}
     <div class="item-card">
         <div class="item-media">
@@ -125,6 +135,30 @@
 </div>
 
 <script>
+let inventorySortAscending = true;
+
+function toggleInventorySort()
+{
+    const grid = document.getElementById("inventoryGrid");
+    if (!grid) return;
+
+    const cards = Array.from(grid.querySelectorAll(".item-card"));
+    cards.sort((a, b) => {
+        const nameA = a.querySelector(".edit-btn").dataset.name.toLowerCase();
+        const nameB = b.querySelector(".edit-btn").dataset.name.toLowerCase();
+        if (nameA < nameB) return inventorySortAscending ? -1 : 1;
+        if (nameA > nameB) return inventorySortAscending ? 1 : -1;
+        return 0;
+    });
+
+    cards.forEach((card) => grid.appendChild(card));
+
+    inventorySortAscending = !inventorySortAscending;
+    document.getElementById("sortToggleBtn").innerHTML =
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h9M3 18h6"/><path d="M17 4v14M17 4l-3 3M17 4l3 3"/></svg> '
+        + (inventorySortAscending ? "Sort A–Z" : "Sort Z–A");
+}
+
 function openEditModal(button)
 {
     const id = button.dataset.id;

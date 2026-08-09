@@ -283,6 +283,11 @@ button {
     color: var(--text-muted);
 }
 
+.inventory-toolbar-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .inventory-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
