@@ -39,7 +39,7 @@
         <tbody>
             {% for log in logs %}
             <tr data-action="{{ log.action }}">
-                <td>{{ log.changed_at.strftime("%Y-%m-%d %H:%M") if log.changed_at else "" }}</td>
+                <td>{{ log.changed_at_display }}</td>
                 <td>{{ log.item_name }}</td>
                 <td>
                     <span class="badge badge-{{ log.action|lower }}">{{ log.action }}</span>

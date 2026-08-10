@@ -14,10 +14,6 @@
         <div class="stat-label">Active Items</div>
     </div>
     <div class="stat-card">
-        <div class="stat-value">${{ "%.2f"|format(stats.total_value) }}</div>
-        <div class="stat-label">Total Inventory Value</div>
-    </div>
-    <div class="stat-card">
         <div class="stat-value {{ 'stat-alert' if stats.low_stock_count > 0 else '' }}">{{ stats.low_stock_count }}</div>
         <div class="stat-label">Low Stock Items</div>
     </div>
@@ -62,7 +58,7 @@
     <div class="activity-item">
         <span class="badge badge-{{ log.action|lower }}">{{ log.action }}</span>
         <span class="activity-text"><strong>{{ log.item_name }}</strong>{% if log.field_name %} &mdash; {{ log.field_name }} changed{% endif %}</span>
-        <span class="activity-time">{{ log.changed_at.strftime("%b %d, %I:%M %p") if log.changed_at else "" }}</span>
+        <span class="activity-time">{{ log.changed_at_display }}</span>
     </div>
     {% endfor %}
 </div>

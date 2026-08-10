@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from flask import (Flask, flash, redirect, render_template, request, send_from_directory, url_for)
 from flask_wtf.csrf import CSRFProtect
@@ -21,6 +22,17 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 csrf = CSRFProtect(app)
 
+# All timestamps are stored naive/UTC (Postgres server default). This
+# converts them to US Eastern (auto-adjusts for EST/EDT) for display only.
+_UTC = ZoneInfo("UTC")
+_EASTERN = ZoneInfo("America/New_York")
+
+
+def format_eastern(dt, fmt="%b %d, %I:%M %p %Z"):
+    if dt is None:
+        return ""
+    return dt.replace(tzinfo=_UTC).astimezone(_EASTERN).strftime(fmt)
+
 
 @app.route("/")
 def dashboard():
@@ -29,7 +41,6 @@ def dashboard():
     active_items = db.query(Inventory).filter(Inventory.is_active == True).all()
 
     total_items = len(active_items)
-    total_value = sum((item.quantity or 0) * float(item.price or 0) for item in active_items)
     low_stock_count = sum(
         1 for item in active_items
         if item.low_stock_threshold is not None and item.quantity is not None
@@ -52,12 +63,12 @@ def dashboard():
     )
     for log in recent_logs:
         log.item_name = item_names.get(log.item_id, log.item_id)
+        log.changed_at_display = format_eastern(log.changed_at)
 
     db.close()
 
     stats = {
         "total_items": total_items,
-        "total_value": total_value,
         "low_stock_count": low_stock_count,
         "added_this_week": added_this_week,
     }
@@ -330,6 +341,7 @@ def reports():
 
     for log in logs:
         log.item_name = item_names.get(log.item_id, log.item_id)
+        log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
 
     db.close()
     return render_template("reports.html", logs=logs)
