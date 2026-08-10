@@ -45,7 +45,9 @@ function exportInventoryToExcel(gridId, filename) {
     if (!grid) return;
 
     const headers = ["Name", "Category", "Quantity", "Price"];
-    const cards = Array.from(grid.querySelectorAll(".item-card"));
+    const cards = Array.from(grid.querySelectorAll(".item-card")).filter((card) => {
+        return window.getComputedStyle(card).display !== "none";
+    });
 
     const rows = cards.map((card) => {
         const btn = card.querySelector(".edit-btn");

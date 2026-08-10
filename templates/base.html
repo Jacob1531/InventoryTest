@@ -11,6 +11,7 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}">
     <script src="{{ url_for('static', filename='js/xlsx-writer.js') }}"></script>
     <script src="{{ url_for('static', filename='js/export.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
 </head>
 <body>
 
@@ -23,6 +24,16 @@
         <p>Inventory &amp; Operations</p>
     </div>
 </header>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div id="flashData" style="display:none;">
+        {% for category, message in messages %}
+        <div data-category="{{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endwith %}
 
 <main class="content">
     {% block content %}{% endblock %}

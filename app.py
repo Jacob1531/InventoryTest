@@ -1,6 +1,7 @@
 import os
+from datetime import datetime, timedelta
 
-from flask import (Flask, redirect, render_template, request, send_from_directory, url_for)
+from flask import (Flask, flash, redirect, render_template, request, send_from_directory, url_for)
 from flask_wtf.csrf import CSRFProtect
 from azure.storage.blob import BlobServiceClient
 from sqlalchemy import text
@@ -23,8 +24,45 @@ csrf = CSRFProtect(app)
 
 @app.route("/")
 def dashboard():
-    #return "Flask is running"
-    return render_template("dashboard.html", title="Dashboard")
+    db = SessionLocal()
+
+    active_items = db.query(Inventory).filter(Inventory.is_active == True).all()
+
+    total_items = len(active_items)
+    total_value = sum((item.quantity or 0) * float(item.price or 0) for item in active_items)
+    low_stock_count = sum(
+        1 for item in active_items
+        if item.low_stock_threshold is not None and item.quantity is not None
+        and item.quantity < item.low_stock_threshold
+    )
+
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    added_this_week = (
+        db.query(InventoryAudit)
+        .filter(InventoryAudit.action == "ADD", InventoryAudit.changed_at >= week_ago)
+        .count()
+    )
+
+    item_names = {str(item.id): item.name for item in db.query(Inventory).all()}
+    recent_logs = (
+        db.query(InventoryAudit)
+        .order_by(InventoryAudit.changed_at.desc())
+        .limit(5)
+        .all()
+    )
+    for log in recent_logs:
+        log.item_name = item_names.get(log.item_id, log.item_id)
+
+    db.close()
+
+    stats = {
+        "total_items": total_items,
+        "total_value": total_value,
+        "low_stock_count": low_stock_count,
+        "added_this_week": added_this_week,
+    }
+
+    return render_template("dashboard.html", title="Dashboard", stats=stats, recent_logs=recent_logs)
 
 @app.route('/favicon.ico')
 def favicon():
@@ -161,6 +199,7 @@ def edit_inventory_item(item_id):
                 print(f"Low stock email failed: {e}")
 
         db.commit()
+        flash(f'"{item.name}" was updated.', "success")
         return redirect(url_for("inventory"))
 
     except Exception as e:
@@ -231,6 +270,7 @@ def add_inventory():
         db.add(audit)
         db.commit()
 
+        flash(f'"{name}" was added to inventory.', "success")
         return redirect(url_for("inventory"))
 
     except Exception as e:
@@ -267,6 +307,7 @@ def delete_inventory(item_id):
         
         db.commit()
 
+        flash(f'"{item.name}" was deleted.', "success")
         return redirect(url_for("inventory"))
 
     except Exception as e:
@@ -343,6 +384,7 @@ def update_threshold(item_id):
         item.low_stock_threshold = int(threshold) if threshold else None
 
         db.commit()
+        flash(f'Low-stock threshold updated for "{item.name}".', "success")
         return redirect(url_for("database_settings"))
     except Exception as e:
         db.rollback()

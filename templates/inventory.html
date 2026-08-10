@@ -9,8 +9,9 @@
 </div>
 
 <div class="inventory-toolbar">
-    <span class="inventory-count">{{ items|length }} item{{ 's' if items|length != 1 else '' }}</span>
+    <span class="inventory-count" id="inventoryCount">{{ items|length }} item{{ 's' if items|length != 1 else '' }}</span>
     <div class="inventory-toolbar-actions">
+        <input type="text" id="inventorySearch" class="search-box" placeholder="Search by name or category..." onkeyup="filterInventory()" style="max-width:220px;">
         <button type="button" class="btn btn-secondary" id="sortToggleBtn" onclick="toggleInventorySort()">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h9M3 18h6"/><path d="M17 4v14M17 4l-3 3M17 4l3 3"/></svg>
             Sort A–Z
@@ -25,8 +26,16 @@
 {% if items %}
 <div class="inventory-grid" id="inventoryGrid">
     {% for item in items %}
-    <div class="item-card">
+    {% set is_out = item.quantity is not none and item.quantity <= 0 %}
+    {% set is_low = not is_out and item.low_stock_threshold is not none and item.quantity is not none and item.quantity < item.low_stock_threshold %}
+    <div class="item-card {{ 'is-out-of-stock' if is_out else ('is-low-stock' if is_low else '') }}"
+         data-name="{{ item.name|lower }}" data-category="{{ item.category|lower }}">
         <div class="item-media">
+            {% if is_out %}
+                <span class="stock-flag flag-out">Out of Stock</span>
+            {% elif is_low %}
+                <span class="stock-flag flag-low">Low Stock</span>
+            {% endif %}
             {% if item.image_url %}
                 <img src="{{ item.image_url }}" alt="{{ item.name }}">
             {% else %}
@@ -136,6 +145,26 @@
 
 <script>
 let inventorySortAscending = true;
+
+function filterInventory()
+{
+    const query = document.getElementById("inventorySearch").value.toLowerCase().trim();
+    const cards = document.querySelectorAll("#inventoryGrid .item-card");
+    let visibleCount = 0;
+
+    cards.forEach((card) => {
+        const matches = card.dataset.name.includes(query) || card.dataset.category.includes(query);
+        card.style.display = matches ? "" : "none";
+        if (matches) visibleCount++;
+    });
+
+    const countEl = document.getElementById("inventoryCount");
+    if (countEl) {
+        countEl.textContent = query
+            ? `${visibleCount} of ${cards.length} item${cards.length !== 1 ? "s" : ""}`
+            : `${cards.length} item${cards.length !== 1 ? "s" : ""}`;
+    }
+}
 
 function toggleInventorySort()
 {
