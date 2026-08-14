@@ -204,9 +204,14 @@ function closeEditModal()
     document.getElementById("editModal").style.display = "none";
 }
 
-window.addEventListener("click", function(event) {
-    const modal = document.getElementById("editModal");
-    if (event.target === modal) closeEditModal();
+let modalMouseDownOnBackdrop = false;
+
+document.getElementById("editModal").addEventListener("mousedown", function(event) {
+    modalMouseDownOnBackdrop = (event.target === this);
+});
+
+document.getElementById("editModal").addEventListener("click", function(event) {
+    if (event.target === this && modalMouseDownOnBackdrop) closeEditModal();
 });
 </script>
 

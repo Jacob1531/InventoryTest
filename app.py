@@ -97,6 +97,24 @@ def favicon():
 #        conn.commit()
 #    return "Migration applied"
 
+# ONE-TIME CLEANUP - visit this URL once to remove the "Meme" test item and
+# its audit history, then DELETE THIS ROUTE. It is not gated behind a
+# confirmation step and will silently do nothing if the item is already gone,
+# so there's no harm in it lingering briefly, but it shouldn't ship in the
+# app long-term - it's a maintenance action, not a feature.
+@app.route("/cleanup-meme-item")
+def cleanup_meme_item():
+    with engine.connect() as conn:
+        conn.execute(text(
+            "DELETE FROM inventory_audit WHERE item_id IN "
+            "(SELECT id::text FROM inventory WHERE name = :name)"
+        ), {"name": "Meme"})
+        conn.execute(text(
+            "DELETE FROM inventory WHERE name = :name AND is_active = false"
+        ), {"name": "Meme"})
+        conn.commit()
+    return "Cleanup applied - remove this route now."
+
 @app.route("/check-schema")
 def check_schema():
     with engine.connect() as conn:
@@ -369,7 +387,12 @@ def debug_db():
     return {"items": output}
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Only turns on the interactive debugger if FLASK_DEBUG=true is set
+    # locally. gunicorn (the real entry point in Azure) never hits this
+    # block at all, but this keeps the file itself safe if it's ever run
+    # directly (e.g. `python app.py` on a dev machine or test VM).
+    debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug_mode)
 
 @app.route("/settings")
 def settings():

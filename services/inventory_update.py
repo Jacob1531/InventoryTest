@@ -36,11 +36,16 @@ def update_inventory_quantity(item_id, new_qty, source="UI"):
         and new_qty < item.low_stock_threshold
     )
 
-    db.commit()
-    db.close()
-
+    # Send the email BEFORE commit/close: SQLAlchemy expires an object's
+    # attributes on commit by default, and this session is about to be
+    # closed. Reading item.name/item.quantity/etc. afterward raises
+    # DetachedInstanceError, which the except below was silently
+    # swallowing - the alert was never actually being sent.
     if crossed_threshold:
         try:
             send_low_stock_email(item)
         except Exception as e:
             print(f"Low stock email failed: {e}")
+
+    db.commit()
+    db.close()
