@@ -564,6 +564,69 @@ input[type="file"] {
     font-size: 14px;
 }
 
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.per-page-select {
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.page-nav-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.page-nav-btn:hover:not(:disabled) {
+    background: var(--surface-muted);
+}
+
+.page-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-nav-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.page-indicator {
+    font-size: 13px;
+    color: var(--text);
+    min-width: 84px;
+    text-align: center;
+}
+
 .badge {
     display: inline-block;
     padding: 3px 10px;

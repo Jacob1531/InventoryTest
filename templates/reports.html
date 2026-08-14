@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 
+<a href="{{ url_for('dashboard') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Dashboard</a>
+
 <div class="page-header">
     <div>
         <h2>Inventory Change History</h2>
@@ -54,30 +56,106 @@
         </tbody>
     </table>
     <p id="noResults" class="no-results" style="display:none;">No matching results.</p>
+    <div class="pagination-bar" id="paginationBar">
+        <span id="pageSummary">Showing 0 of 0</span>
+        <div class="pagination-controls">
+            <label for="perPageSelect" style="margin-right:2px;">Rows per page:</label>
+            <select id="perPageSelect" class="per-page-select" onchange="changeReportsPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button type="button" class="page-nav-btn" id="prevPageBtn" onclick="goToReportsPage(-1)" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-indicator" id="pageIndicator">Page 1 of 1</span>
+            <button type="button" class="page-nav-btn" id="nextPageBtn" onclick="goToReportsPage(1)" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
 </div>
 
-<a href="{{ url_for('dashboard') }}" class="back-link">← Back to Dashboard</a>
-
 <script>
+let reportsCurrentPage = 1;
+let reportsPerPage = 25;
+
 function filterReports()
 {
     const searchInput = document.getElementById("reportSearch").value.toLowerCase();
     const actionInput = document.getElementById("actionFilter").value;
     const rows = document.querySelectorAll("#reportsTable tbody tr");
-    let visibleCount = 0;
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const matchesSearch = text.includes(searchInput);
         const matchesAction = actionInput === "" || row.dataset.action === actionInput;
-        const isVisible = matchesSearch && matchesAction;
-
-        row.style.display = isVisible ? "" : "none";
-        if (isVisible) visibleCount++;
+        row.dataset.filterMatch = (matchesSearch && matchesAction) ? "true" : "false";
     });
 
-    document.getElementById("noResults").style.display = visibleCount === 0 ? "block" : "none";
+    reportsCurrentPage = 1;
+    renderReportsPage();
 }
+
+function changeReportsPageSize(value)
+{
+    reportsPerPage = parseInt(value, 10);
+    reportsCurrentPage = 1;
+    renderReportsPage();
+}
+
+function goToReportsPage(delta)
+{
+    reportsCurrentPage += delta;
+    renderReportsPage();
+}
+
+function renderReportsPage()
+{
+    const allRows = Array.from(document.querySelectorAll("#reportsTable tbody tr"));
+    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
+    const totalFiltered = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / reportsPerPage));
+
+    if (reportsCurrentPage > totalPages) reportsCurrentPage = totalPages;
+    if (reportsCurrentPage < 1) reportsCurrentPage = 1;
+
+    const startIdx = (reportsCurrentPage - 1) * reportsPerPage;
+    const endIdx = startIdx + reportsPerPage;
+
+    let shownCount = 0;
+    allRows.forEach(row => {
+        if (row.dataset.filterMatch === "false") {
+            row.style.display = "none";
+            return;
+        }
+        const idxInFiltered = filteredRows.indexOf(row);
+        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
+        row.style.display = onCurrentPage ? "" : "none";
+        if (onCurrentPage) shownCount++;
+    });
+
+    document.getElementById("noResults").style.display = totalFiltered === 0 ? "block" : "none";
+    document.getElementById("paginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
+
+    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
+    const rangeEnd = Math.min(endIdx, totalFiltered);
+    document.getElementById("pageSummary").textContent =
+        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
+    document.getElementById("pageIndicator").textContent =
+        `Page ${reportsCurrentPage} of ${totalPages}`;
+
+    document.getElementById("prevPageBtn").disabled = reportsCurrentPage <= 1;
+    document.getElementById("nextPageBtn").disabled = reportsCurrentPage >= totalPages;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("#reportsTable tbody tr").forEach(row => {
+        row.dataset.filterMatch = "true";
+    });
+    renderReportsPage();
+});
 </script>
 
 {% endblock %}

@@ -1,7 +1,22 @@
 /**
+ * Whether a row should be included in an export. Tables with client-side
+ * pagination (like Reports) mark rows with data-filter-match so that rows
+ * merely hidden by pagination (rather than excluded by search/filter) are
+ * still exported. Tables without pagination fall back to checking the
+ * rendered display style.
+ */
+function isRowExportable(row) {
+    if (row.dataset.filterMatch !== undefined) {
+        return row.dataset.filterMatch !== "false";
+    }
+    return window.getComputedStyle(row).display !== "none";
+}
+
+/**
  * Exports an HTML table to an .xlsx file, respecting:
- *  - any client-side filtering already applied (rows hidden via display:none
- *    are skipped)
+ *  - any client-side filtering already applied (rows excluded by search or
+ *    an action filter are skipped - see isRowExportable above; rows merely
+ *    hidden by pagination are still included)
  *  - live values of any <input>/<select> cells (e.g. threshold fields),
  *    rather than their original server-rendered value
  *  - columns marked with class="no-export" on the <th> (action columns,
@@ -17,11 +32,9 @@ function exportTableToExcel(tableId, filename) {
         .filter((i) => i >= 0);
     const headers = headerIndexes.map((i) => allHeaderCells[i].textContent.trim());
 
-    const visibleRows = Array.from(table.querySelectorAll("tbody tr")).filter((row) => {
-        return window.getComputedStyle(row).display !== "none";
-    });
+    const includedRows = Array.from(table.querySelectorAll("tbody tr")).filter(isRowExportable);
 
-    const rows = visibleRows.map((row) => {
+    const rows = includedRows.map((row) => {
         const cells = Array.from(row.children);
         return headerIndexes.map((i) => {
             const cell = cells[i];
