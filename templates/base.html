@@ -33,6 +33,10 @@
             <span class="brand-tagline">Inventory &amp; Operations</span>
         </span>
     </a>
+    <a href="{{ url_for('account_settings') }}" class="header-account">
+        <span class="header-account-avatar">{{ header_user[0]|upper if header_user and header_user != "unknown" else "?" }}</span>
+        <span class="header-account-name">{{ header_user if header_user and header_user != "unknown" else "Unknown user" }}</span>
+    </a>
 </header>
 
 {% with messages = get_flashed_messages(with_categories=true) %}

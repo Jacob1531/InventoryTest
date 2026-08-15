@@ -22,6 +22,14 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 csrf = CSRFProtect(app)
 
+
+@app.context_processor
+def inject_current_user():
+    """Makes the signed-in user's identity available in every template
+    (used by the header's account chip) without passing it through every
+    single render_template call."""
+    return {"header_user": get_user()}
+
 # All timestamps are stored naive/UTC (Postgres server default). This
 # converts them to US Eastern (auto-adjusts for EST/EDT) for display only.
 _UTC = ZoneInfo("UTC")

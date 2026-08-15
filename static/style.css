@@ -118,6 +118,17 @@ button {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
+.top-bar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--text-faint) 0%, transparent 60%);
+    opacity: 0.35;
+}
+
 .brand {
     display: flex;
     align-items: center;
@@ -157,6 +168,49 @@ button {
     font-size: 12px;
     color: var(--header-text-muted);
     margin-top: 1px;
+}
+
+.header-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    padding: 6px 12px 6px 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    transition: background-color 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+}
+
+.header-account:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.header-account-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--header-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.header-account-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--header-text);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .content {
