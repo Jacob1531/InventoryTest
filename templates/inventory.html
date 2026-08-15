@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 
+<a href="{{ url_for('dashboard') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Dashboard</a>
+
 <div class="page-header">
     <div>
         <h2>Inventory</h2>
@@ -215,5 +217,4 @@ document.getElementById("editModal").addEventListener("click", function(event) {
 });
 </script>
 
-<a href="{{ url_for('dashboard') }}" class="back-link">← Back to Dashboard</a>
 {% endblock %}

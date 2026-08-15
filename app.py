@@ -166,7 +166,7 @@ def inventory():
 
 
     db.close()
-    return render_template("inventory.html", items=items)
+    return render_template("inventory.html", items=items, title="Inventory")
 
 
 @app.route("/inventory/update", methods=["POST"])
@@ -408,7 +408,7 @@ def reports():
         log.new_value_display = format_audit_value(log.field_name, log.new_value)
 
     db.close()
-    return render_template("reports.html", logs=logs)
+    return render_template("reports.html", logs=logs, title="Reports")
 
 #for debug purposes. Wont exist for deployment
 @app.route("/debug-db")
@@ -434,7 +434,7 @@ def debug_db():
 
 @app.route("/settings")
 def settings():
-    return render_template("settings.html")
+    return render_template("settings.html", title="Settings")
 
 
 @app.route("/settings/database")
@@ -442,7 +442,7 @@ def database_settings():
     db = SessionLocal()
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
     db.close()
-    return render_template("database_settings.html", items=items)
+    return render_template("database_settings.html", items=items, title="Database Settings")
 
 
 @app.route("/settings/database/update/<int:item_id>", methods=["POST"])
@@ -485,7 +485,7 @@ def account_settings():
         log.new_value_display = format_audit_value(log.field_name, log.new_value)
     db.close()
 
-    return render_template("account_settings.html", current_user=current_user, my_logs=my_logs)
+    return render_template("account_settings.html", current_user=current_user, my_logs=my_logs, title="Account Settings")
 
 
 

@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 
+<a href="{{ url_for('settings') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Settings</a>
+
 <div class="page-header">
     <div>
         <h2>Database Settings</h2>
@@ -50,5 +52,4 @@
 <div class="empty-state">No inventory items to configure yet.</div>
 {% endif %}
 
-<a href="{{ url_for('settings') }}" class="back-link">← Back to Settings</a>
 {% endblock %}
