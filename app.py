@@ -34,6 +34,33 @@ def format_eastern(dt, fmt="%b %d, %I:%M %p %Z"):
     return dt.replace(tzinfo=_UTC).astimezone(_EASTERN).strftime(fmt)
 
 
+# Only these audit fields are ever truly numeric - scoping the scientific
+# notation formatting to just these avoids misformatting something like an
+# item name or category that happens to be a numeric-looking string.
+_NUMERIC_AUDIT_FIELDS = {"quantity", "price"}
+
+# Hard ceiling on quantity/price magnitude, enforced at input time (see
+# add_inventory / edit_inventory_item / update_inventory below). Keeps
+# both fields within a sane range regardless of sign.
+MAX_NUMERIC_VALUE = 999999999
+
+
+def format_audit_value(field_name, value):
+    """Display-only formatting: values stored in the DB are never touched.
+    Any quantity/price value beyond +/-999999 is shown in scientific
+    notation so a bad input (accidental or otherwise) can't blow out the
+    Reports table's layout."""
+    if value is None or field_name not in _NUMERIC_AUDIT_FIELDS:
+        return value
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return value
+    if abs(num) > 999999:
+        return f"{num:.2e}"
+    return value
+
+
 @app.route("/")
 def dashboard():
     db = SessionLocal()
@@ -145,9 +172,22 @@ def inventory():
 @app.route("/inventory/update", methods=["POST"])
 def update_inventory():
     id = request.form["id"]
-    new_qty = int(request.form["quantity"])
 
-    update_inventory_quantity(id, new_qty)
+    try:
+        new_qty = int(request.form["quantity"])
+    except (KeyError, ValueError, TypeError):
+        return "Invalid numeric input", 400
+
+    if new_qty < 0:
+        return "Quantity can't be negative", 400
+    if abs(new_qty) > MAX_NUMERIC_VALUE:
+        return f"Quantity can't exceed {MAX_NUMERIC_VALUE}", 400
+
+    try:
+        update_inventory_quantity(id, new_qty)
+    except ValueError as e:
+        return str(e), 404
+
     return redirect(url_for("inventory"))
 
 @app.route("/inventory/edit/<int:item_id>", methods=["POST"])
@@ -178,6 +218,8 @@ def edit_inventory_item(item_id):
             return "Quantity can't be negative", 400
         if new_price < 0.01:
             return "Price must be positive", 400
+        if abs(new_quantity) > MAX_NUMERIC_VALUE or abs(new_price) > MAX_NUMERIC_VALUE:
+            return f"Quantity and price can't exceed {MAX_NUMERIC_VALUE}", 400
         
         old_quantity = item.quantity
 
@@ -263,6 +305,8 @@ def add_inventory():
 
             if quantity < 0 or price < 0:
                 return "Error: Quantity and price must be positive.", 400
+            if abs(quantity) > MAX_NUMERIC_VALUE or abs(price) > MAX_NUMERIC_VALUE:
+                return f"Error: Quantity and price can't exceed {MAX_NUMERIC_VALUE}.", 400
 
         except:
             return "Error: Invalid numeric input.", 400
@@ -360,6 +404,8 @@ def reports():
     for log in logs:
         log.item_name = item_names.get(log.item_id, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
+        log.old_value_display = format_audit_value(log.field_name, log.old_value)
+        log.new_value_display = format_audit_value(log.field_name, log.new_value)
 
     db.close()
     return render_template("reports.html", logs=logs)
@@ -385,14 +431,6 @@ def debug_db():
 
     db.close()
     return {"items": output}
-
-if __name__ == "__main__":
-    # Only turns on the interactive debugger if FLASK_DEBUG=true is set
-    # locally. gunicorn (the real entry point in Azure) never hits this
-    # block at all, but this keeps the file itself safe if it's ever run
-    # directly (e.g. `python app.py` on a dev machine or test VM).
-    debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
-    app.run(debug=debug_mode)
 
 @app.route("/settings")
 def settings():
@@ -430,7 +468,24 @@ def update_threshold(item_id):
 
 @app.route("/settings/account")
 def account_settings():
-    return render_template("account_settings.html")
+    current_user = get_user()
+
+    db = SessionLocal()
+    item_names = {str(item.id): item.name for item in db.query(Inventory).all()}
+    my_logs = (
+        db.query(InventoryAudit)
+        .filter(InventoryAudit.changed_by == current_user)
+        .order_by(InventoryAudit.changed_at.desc())
+        .all()
+    )
+    for log in my_logs:
+        log.item_name = item_names.get(log.item_id, log.item_id)
+        log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
+        log.old_value_display = format_audit_value(log.field_name, log.old_value)
+        log.new_value_display = format_audit_value(log.field_name, log.new_value)
+    db.close()
+
+    return render_template("account_settings.html", current_user=current_user, my_logs=my_logs)
 
 
 
@@ -462,3 +517,19 @@ def account_settings():
 
 #if __name__ == '__main__':
 #   app.run()
+
+
+if __name__ == "__main__":
+    # Only turns on the interactive debugger if FLASK_DEBUG=true is set
+    # locally. gunicorn (the real entry point in Azure) never hits this
+    # block at all, but this keeps the file itself safe if it's ever run
+    # directly (e.g. `python app.py` on a dev machine or test VM).
+    #
+    # This MUST stay at the true bottom of the file, after every route
+    # definition. app.run() blocks until the server stops, so any route
+    # defined after this point would never get registered when the file
+    # is run directly with `python app.py` (though gunicorn - the real
+    # production entry point - imports the module without ever reaching
+    # this block, so that path is unaffected either way).
+    debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug_mode)

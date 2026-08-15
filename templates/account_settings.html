@@ -1,14 +1,195 @@
 {% extends "base.html" %}
 {% block content %}
 
+<a href="{{ url_for('settings') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Settings</a>
+
 <div class="page-header">
     <div>
         <h2>Account Settings</h2>
-        <p class="page-subtitle">Coming soon.</p>
+        <p class="page-subtitle">Your identity, preferences, and personal activity history.</p>
     </div>
 </div>
 
-<div class="empty-state">Account settings will appear here once available.</div>
+<div class="panel account-panel">
+    <div class="account-identity">
+        <div class="account-avatar">{{ current_user[0]|upper if current_user and current_user != "unknown" else "?" }}</div>
+        <div>
+            <div class="account-name">
+                {% if current_user and current_user != "unknown" %}
+                    {{ current_user }}
+                {% else %}
+                    Unknown user
+                {% endif %}
+            </div>
+            <div class="account-sub">Signed in via Microsoft Entra ID</div>
+        </div>
+    </div>
+    <a href="/.auth/logout?post_logout_redirect_uri=/" class="btn btn-danger-outline">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+    </a>
+</div>
 
-<a href="{{ url_for('settings') }}" class="back-link">← Back to Settings</a>
+<div class="panel" style="margin-bottom:28px;">
+    <div class="theme-toggle-row">
+        <div>
+            <div class="field-label">Dark Mode</div>
+            <div class="field-hint">Applies across the whole app on this device.</div>
+        </div>
+        <label class="switch">
+            <input type="checkbox" id="themeToggle">
+            <span class="switch-slider"></span>
+        </label>
+    </div>
+</div>
+
+<h3 class="section-heading">My Activity</h3>
+
+{% if my_logs %}
+<div class="filters">
+    <input type="text" id="myActivitySearch" placeholder="Search by item, action..." onkeyup="filterMyActivity()" class="search-box">
+    <select id="myActivityActionFilter" onchange="filterMyActivity()" class="action-filter">
+        <option value="">All Actions</option>
+        <option value="ADD">Add</option>
+        <option value="UPDATE">Update</option>
+        <option value="DELETE">Delete</option>
+    </select>
+    <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('myActivityTable', 'my-activity.xlsx')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export to Excel
+    </button>
+</div>
+
+<div class="table-wrap">
+    <table id="myActivityTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Date/Time</th>
+                <th>Item</th>
+                <th>Action</th>
+                <th>Field</th>
+                <th>Old Value</th>
+                <th>New Value</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in my_logs %}
+            <tr data-action="{{ log.action }}">
+                <td>{{ log.changed_at_display }}</td>
+                <td>{{ log.item_name }}</td>
+                <td><span class="badge badge-{{ log.action|lower }}">{{ log.action }}</span></td>
+                <td>{{ log.field_name or "-" }}</td>
+                <td>{{ log.old_value_display or "-" }}</td>
+                <td>{{ log.new_value_display or "-" }}</td>
+                <td>{{ log.source }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p id="myActivityNoResults" class="no-results" style="display:none;">No matching results.</p>
+    <div class="pagination-bar" id="myActivityPaginationBar">
+        <span id="myActivityPageSummary">Showing 0 of 0</span>
+        <div class="pagination-controls">
+            <label for="myActivityPerPageSelect" style="margin-right:2px;">Rows per page:</label>
+            <select id="myActivityPerPageSelect" class="per-page-select" onchange="changeMyActivityPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button type="button" class="page-nav-btn" id="myActivityPrevBtn" onclick="goToMyActivityPage(-1)" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-indicator" id="myActivityPageIndicator">Page 1 of 1</span>
+            <button type="button" class="page-nav-btn" id="myActivityNextBtn" onclick="goToMyActivityPage(1)" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let myActivityCurrentPage = 1;
+let myActivityPerPage = 25;
+
+function filterMyActivity()
+{
+    const searchInput = document.getElementById("myActivitySearch").value.toLowerCase();
+    const actionInput = document.getElementById("myActivityActionFilter").value;
+    const rows = document.querySelectorAll("#myActivityTable tbody tr");
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const matchesSearch = text.includes(searchInput);
+        const matchesAction = actionInput === "" || row.dataset.action === actionInput;
+        row.dataset.filterMatch = (matchesSearch && matchesAction) ? "true" : "false";
+    });
+
+    myActivityCurrentPage = 1;
+    renderMyActivityPage();
+}
+
+function changeMyActivityPageSize(value)
+{
+    myActivityPerPage = parseInt(value, 10);
+    myActivityCurrentPage = 1;
+    renderMyActivityPage();
+}
+
+function goToMyActivityPage(delta)
+{
+    myActivityCurrentPage += delta;
+    renderMyActivityPage();
+}
+
+function renderMyActivityPage()
+{
+    const allRows = Array.from(document.querySelectorAll("#myActivityTable tbody tr"));
+    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
+    const totalFiltered = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / myActivityPerPage));
+
+    if (myActivityCurrentPage > totalPages) myActivityCurrentPage = totalPages;
+    if (myActivityCurrentPage < 1) myActivityCurrentPage = 1;
+
+    const startIdx = (myActivityCurrentPage - 1) * myActivityPerPage;
+    const endIdx = startIdx + myActivityPerPage;
+
+    allRows.forEach(row => {
+        if (row.dataset.filterMatch === "false") {
+            row.style.display = "none";
+            return;
+        }
+        const idxInFiltered = filteredRows.indexOf(row);
+        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
+        row.style.display = onCurrentPage ? "" : "none";
+    });
+
+    document.getElementById("myActivityNoResults").style.display = totalFiltered === 0 ? "block" : "none";
+    document.getElementById("myActivityPaginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
+
+    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
+    const rangeEnd = Math.min(endIdx, totalFiltered);
+    document.getElementById("myActivityPageSummary").textContent =
+        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
+    document.getElementById("myActivityPageIndicator").textContent =
+        `Page ${myActivityCurrentPage} of ${totalPages}`;
+
+    document.getElementById("myActivityPrevBtn").disabled = myActivityCurrentPage <= 1;
+    document.getElementById("myActivityNextBtn").disabled = myActivityCurrentPage >= totalPages;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("#myActivityTable tbody tr").forEach(row => {
+        row.dataset.filterMatch = "true";
+    });
+    renderMyActivityPage();
+});
+</script>
+
+{% else %}
+<div class="empty-state">You haven't made any inventory changes yet.</div>
+{% endif %}
+
 {% endblock %}
