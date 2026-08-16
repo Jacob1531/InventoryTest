@@ -86,32 +86,38 @@
     <h2>Add Inventory Item</h2>
     <p class="panel-subtitle">Fields marked required must be filled in before submitting.</p>
 
-    <form method="POST" action="{{ url_for('add_inventory') }}" enctype="multipart/form-data">
+    <form id="addForm" method="POST" action="{{ url_for('add_inventory') }}" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p id="addFormError" class="form-error-banner" style="display:none;"></p>
         <div class="form-grid">
             <div class="field">
                 <label for="addName">Name</label>
                 <input type="text" id="addName" name="name" placeholder="Item name" required>
+                <span class="field-error" id="addNameError"></span>
             </div>
             <div class="field">
                 <label for="addCategory">Category</label>
                 <input type="text" id="addCategory" name="category" placeholder="Category" required>
+                <span class="field-error" id="addCategoryError"></span>
             </div>
             <div class="field">
                 <label for="addQuantity">Quantity</label>
                 <input type="number" id="addQuantity" name="quantity" placeholder="0" required min="0">
+                <span class="field-error" id="addQuantityError"></span>
             </div>
             <div class="field">
                 <label for="addPrice">Price</label>
                 <input type="number" id="addPrice" step="0.01" name="price" placeholder="0.00" required min="0">
+                <span class="field-error" id="addPriceError"></span>
             </div>
             <div class="field">
                 <label for="addImage">Image</label>
                 <input type="file" id="addImage" name="image" accept="image/*" required>
+                <span class="field-error" id="addImageError"></span>
             </div>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Add Item</button>
+            <button type="submit" class="btn btn-primary" id="addSaveBtn">Add Item</button>
         </div>
     </form>
 </div>
@@ -122,28 +128,34 @@
         <h2>Edit Item</h2>
         <form id="editForm" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p id="editFormError" class="form-error-banner" style="display:none;"></p>
             <div class="field">
                 <label for="editName">Name</label>
                 <input type="text" id="editName" name="name" required>
+                <span class="field-error" id="editNameError"></span>
             </div>
             <div class="field">
                 <label for="editCategory">Category</label>
                 <input type="text" id="editCategory" name="category" required>
+                <span class="field-error" id="editCategoryError"></span>
             </div>
             <div class="field">
                 <label for="editQuantity">Quantity</label>
                 <input type="number" id="editQuantity" name="quantity" required min="0">
+                <span class="field-error" id="editQuantityError"></span>
             </div>
             <div class="field">
                 <label for="editPrice">Price</label>
                 <input type="number" step="0.01" id="editPrice" name="price" required min="0">
+                <span class="field-error" id="editPriceError"></span>
             </div>
             <div class="field">
                 <label for="editImage">Replace image (optional)</label>
                 <input type="file" id="editImage" name="image" accept=".jpg,.jpeg,.png">
+                <span class="field-error" id="editImageError"></span>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="submit" class="btn btn-primary" id="editSaveBtn">Save Changes</button>
             </div>
         </form>
     </div>
@@ -257,6 +269,99 @@ function toggleInventorySort()
         + (inventorySortAscending ? "Sort A–Z" : "Sort Z–A");
 }
 
+// ---- Add form validation (mirrors app.py's add_inventory rules) ----
+
+const ADD_FIELDS = ["name", "category", "quantity", "price", "image"];
+
+function validateAddForm()
+{
+    const errors = {};
+
+    const name = document.getElementById("addName").value.trim();
+    if (!name) errors.name = "Name is required.";
+
+    const category = document.getElementById("addCategory").value.trim();
+    if (!category) errors.category = "Category is required.";
+
+    const qtyStr = document.getElementById("addQuantity").value.trim();
+    const qtyNum = qtyStr === "" ? NaN : Number(qtyStr);
+    if (Number.isNaN(qtyNum) || !Number.isInteger(qtyNum)) {
+        errors.quantity = "Quantity must be a whole number.";
+    } else if (qtyNum < 0) {
+        errors.quantity = "Quantity can't be negative.";
+    } else if (qtyNum > 999999999) {
+        errors.quantity = "Quantity can't exceed 999999999.";
+    }
+
+    const priceStr = document.getElementById("addPrice").value.trim();
+    const priceNum = priceStr === "" ? NaN : Number(priceStr);
+    if (Number.isNaN(priceNum)) {
+        errors.price = "Price must be a number.";
+    } else if (priceNum < 0) {
+        errors.price = "Price can't be negative.";
+    } else if (priceNum > 999999999) {
+        errors.price = "Price can't exceed 999999999.";
+    }
+
+    const imageFile = document.getElementById("addImage").files[0];
+    if (!imageFile) {
+        errors.image = "An image is required.";
+    } else if (!/\.(jpe?g|png)$/i.test(imageFile.name)) {
+        errors.image = "Only PNG/JPG images are allowed.";
+    }
+
+    ADD_FIELDS.forEach((field) => {
+        const input = document.getElementById("add" + capitalize(field));
+        const errEl = document.getElementById("add" + capitalize(field) + "Error");
+        const message = errors[field];
+        input.classList.toggle("has-error", !!message);
+        errEl.textContent = message || "";
+    });
+
+    return Object.keys(errors).length === 0;
+}
+
+ADD_FIELDS.forEach((field) => {
+    const eventType = field === "image" ? "change" : "input";
+    document.getElementById("add" + capitalize(field)).addEventListener(eventType, validateAddForm);
+});
+
+document.getElementById("addForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    if (!validateAddForm()) return;
+
+    const form = event.target;
+    const saveBtn = document.getElementById("addSaveBtn");
+    const errorBanner = document.getElementById("addFormError");
+    errorBanner.style.display = "none";
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Adding...";
+
+    fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+    })
+        .then(res => res.text().then(text => ({ ok: res.ok, text })))
+        .then(({ ok, text }) => {
+            if (!ok) {
+                errorBanner.textContent = text || "Add failed. Please check the values and try again.";
+                errorBanner.style.display = "block";
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Add Item";
+                return;
+            }
+            window.location.reload();
+        })
+        .catch(() => {
+            errorBanner.textContent = "Couldn't reach the server. Please try again.";
+            errorBanner.style.display = "block";
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Add Item";
+        });
+});
+
 function openEditModal(button)
 {
     const id = button.dataset.id;
@@ -265,6 +370,8 @@ function openEditModal(button)
     document.getElementById("editQuantity").value = button.dataset.quantity;
     document.getElementById("editPrice").value = button.dataset.price;
     document.getElementById("editForm").action = "/inventory/edit/" + id;
+    document.getElementById("editImage").value = "";
+    clearEditFormErrors();
     document.getElementById("editModal").style.display = "block";
 }
 
@@ -272,6 +379,116 @@ function closeEditModal()
 {
     document.getElementById("editModal").style.display = "none";
 }
+
+// ---- Edit form validation (mirrors app.py's edit_inventory_item rules) ----
+
+const EDIT_FIELDS = ["name", "category", "quantity", "price"];
+
+function clearEditFormErrors()
+{
+    document.getElementById("editFormError").style.display = "none";
+    document.getElementById("editFormError").textContent = "";
+    EDIT_FIELDS.concat(["image"]).forEach((field) => {
+        const input = document.getElementById("edit" + capitalize(field));
+        const errEl = document.getElementById("edit" + capitalize(field) + "Error");
+        if (input) input.classList.remove("has-error");
+        if (errEl) errEl.textContent = "";
+    });
+}
+
+function capitalize(s)
+{
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function validateEditForm()
+{
+    const errors = {};
+
+    const name = document.getElementById("editName").value.trim();
+    if (!name) errors.name = "Name is required.";
+
+    const category = document.getElementById("editCategory").value.trim();
+    if (!category) errors.category = "Category is required.";
+
+    const qtyStr = document.getElementById("editQuantity").value.trim();
+    const qtyNum = qtyStr === "" ? NaN : Number(qtyStr);
+    if (Number.isNaN(qtyNum) || !Number.isInteger(qtyNum)) {
+        errors.quantity = "Quantity must be a whole number.";
+    } else if (qtyNum < 0) {
+        errors.quantity = "Quantity can't be negative.";
+    } else if (qtyNum > 999999999) {
+        errors.quantity = "Quantity can't exceed 999999999.";
+    }
+
+    const priceStr = document.getElementById("editPrice").value.trim();
+    const priceNum = priceStr === "" ? NaN : Number(priceStr);
+    if (Number.isNaN(priceNum)) {
+        errors.price = "Price must be a number.";
+    } else if (priceNum < 0) {
+        errors.price = "Price can't be negative.";
+    } else if (priceNum > 999999999) {
+        errors.price = "Price can't exceed 999999999.";
+    }
+
+    const imageFile = document.getElementById("editImage").files[0];
+    if (imageFile && !/\.(jpe?g|png)$/i.test(imageFile.name)) {
+        errors.image = "Only PNG/JPG images are allowed.";
+    }
+
+    EDIT_FIELDS.concat(["image"]).forEach((field) => {
+        const input = document.getElementById("edit" + capitalize(field));
+        const errEl = document.getElementById("edit" + capitalize(field) + "Error");
+        const message = errors[field];
+        input.classList.toggle("has-error", !!message);
+        errEl.textContent = message || "";
+    });
+
+    return Object.keys(errors).length === 0;
+}
+
+EDIT_FIELDS.forEach((field) => {
+    document.getElementById("edit" + capitalize(field)).addEventListener("input", validateEditForm);
+});
+document.getElementById("editImage").addEventListener("change", validateEditForm);
+
+document.getElementById("editForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    if (!validateEditForm()) return;
+
+    const form = event.target;
+    const saveBtn = document.getElementById("editSaveBtn");
+    const errorBanner = document.getElementById("editFormError");
+    errorBanner.style.display = "none";
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+    })
+        .then(res => res.text().then(text => ({ ok: res.ok, text })))
+        .then(({ ok, text }) => {
+            if (!ok) {
+                // Show the server's rejection reason inline instead of ever
+                // letting the browser navigate to it as a raw response page.
+                errorBanner.textContent = text || "Save failed. Please check the values and try again.";
+                errorBanner.style.display = "block";
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Save Changes";
+                return;
+            }
+            window.location.reload();
+        })
+        .catch(() => {
+            errorBanner.textContent = "Couldn't reach the server. Please try again.";
+            errorBanner.style.display = "block";
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Save Changes";
+        });
+});
 
 let modalMouseDownOnBackdrop = false;
 

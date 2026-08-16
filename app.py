@@ -273,8 +273,8 @@ def edit_inventory_item(item_id):
 
         if new_quantity < 0:
             return "Quantity can't be negative", 400
-        if new_price < 0.01:
-            return "Price must be positive", 400
+        if new_price < 0:
+            return "Price can't be negative", 400
         if abs(new_quantity) > MAX_NUMERIC_VALUE or abs(new_price) > MAX_NUMERIC_VALUE:
             return f"Quantity and price can't exceed {MAX_NUMERIC_VALUE}", 400
         
