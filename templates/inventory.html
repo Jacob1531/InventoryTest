@@ -22,6 +22,10 @@
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export to Excel
         </button>
+        <button type="button" class="btn btn-secondary" onclick="openImportModal()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import from Excel
+        </button>
     </div>
 </div>
 
@@ -41,7 +45,7 @@
             {% if item.image_url %}
                 <img src="{{ item.image_url }}" alt="{{ item.name }}">
             {% else %}
-                <span class="no-image">No image</span>
+                <img src="{{ url_for('static', filename='placeholder.png') }}" alt="No image available">
             {% endif %}
         </div>
         <div class="item-body">
@@ -145,6 +149,69 @@
     </div>
 </div>
 
+<div id="importModal" class="modal">
+    <div class="modal-content import-modal-content">
+        <span class="close" onclick="closeImportModal()">&times;</span>
+        <h2>Import from Excel</h2>
+
+        <div id="importStepUpload">
+            <p class="panel-subtitle">Upload a .xlsx file with <strong>Name</strong>, <strong>Category</strong>, <strong>Quantity</strong>, and <strong>Price</strong> columns. Items that match an existing name will be updated; new names will be added.</p>
+            <div class="field">
+                <input type="file" id="importFileInput" accept=".xlsx">
+            </div>
+            <p id="importUploadError" class="import-error-text" style="display:none;"></p>
+            <div class="form-actions" style="display:flex; gap:8px;">
+                <button type="button" class="btn btn-primary" onclick="uploadImportFile()">Preview Import</button>
+                <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+            </div>
+        </div>
+
+        <div id="importStepReview" style="display:none;">
+            <p class="panel-subtitle" id="importReviewSummary"></p>
+            <div class="import-review-wrap">
+                <table class="reports-table" id="importReviewTable">
+                    <thead>
+                        <tr>
+                            <th>Row</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="importReviewBody"></tbody>
+                </table>
+            </div>
+            <div class="form-actions" style="display:flex; gap:8px; align-items:center;">
+                <button type="button" class="btn btn-primary" id="importNextBtn" onclick="goToImportImagesStep()">Next →</button>
+                <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+                <span id="importConfirmHint" class="import-error-text"></span>
+            </div>
+        </div>
+
+        <div id="importStepImages" style="display:none;">
+            <p class="panel-subtitle">Optionally attach an image for each item. Anything left blank uses a plain placeholder image - you can always add a photo later from the Inventory page.</p>
+            <div class="import-review-wrap">
+                <table class="reports-table" id="importImagesTable">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Image</th>
+                        </tr>
+                    </thead>
+                    <tbody id="importImagesBody"></tbody>
+                </table>
+            </div>
+            <div class="form-actions" style="display:flex; gap:8px; align-items:center;">
+                <button type="button" class="btn btn-secondary" onclick="goToImportReviewStep()">← Back</button>
+                <button type="button" class="btn btn-primary" id="importCommitBtn" onclick="commitImport()">Import Items</button>
+                <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+                <span id="importImagesHint" class="import-error-text"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 let inventorySortAscending = true;
 
@@ -215,6 +282,356 @@ document.getElementById("editModal").addEventListener("mousedown", function(even
 document.getElementById("editModal").addEventListener("click", function(event) {
     if (event.target === this && modalMouseDownOnBackdrop) closeEditModal();
 });
+
+let importModalMouseDownOnBackdrop = false;
+
+document.getElementById("importModal").addEventListener("mousedown", function(event) {
+    importModalMouseDownOnBackdrop = (event.target === this);
+});
+
+document.getElementById("importModal").addEventListener("click", function(event) {
+    if (event.target === this && importModalMouseDownOnBackdrop) closeImportModal();
+});
+
+// ---- Excel import ----
+
+let importRows = [];
+
+function csrfToken()
+{
+    return document.querySelector('meta[name="csrf-token"]').content;
+}
+
+function openImportModal()
+{
+    document.getElementById("importFileInput").value = "";
+    document.getElementById("importUploadError").style.display = "none";
+    document.getElementById("importStepUpload").style.display = "block";
+    document.getElementById("importStepReview").style.display = "none";
+    document.getElementById("importStepImages").style.display = "none";
+    document.getElementById("importConfirmHint").textContent = "";
+    document.getElementById("importImagesHint").textContent = "";
+    importRows = [];
+    importImageFiles = {};
+    document.getElementById("importModal").style.display = "block";
+}
+
+function closeImportModal()
+{
+    document.getElementById("importModal").style.display = "none";
+}
+
+function uploadImportFile()
+{
+    const fileInput = document.getElementById("importFileInput");
+    const errorEl = document.getElementById("importUploadError");
+    errorEl.style.display = "none";
+
+    if (!fileInput.files.length) {
+        errorEl.textContent = "Choose a .xlsx file first.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    fetch("/inventory/import/preview", {
+        method: "POST",
+        headers: { "X-CSRFToken": csrfToken() },
+        body: formData,
+    })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) {
+                errorEl.textContent = data.error || "Something went wrong reading that file.";
+                errorEl.style.display = "block";
+                return;
+            }
+            importRows = data.rows;
+            showImportReview();
+        })
+        .catch(() => {
+            errorEl.textContent = "Couldn't reach the server. Please try again.";
+            errorEl.style.display = "block";
+        });
+}
+
+// Mirrors services/excel_import.py's validate_row so corrections get
+// instant feedback without a round trip for every keystroke. The server
+// re-validates everything again before writing to the database regardless.
+function validateImportRowClient(row)
+{
+    const errors = {};
+
+    const name = String(row.name ?? "").trim();
+    if (!name) errors.name = "Name is required.";
+
+    const category = String(row.category ?? "").trim();
+    if (!category) errors.category = "Category is required.";
+
+    const qtyStr = String(row.quantity ?? "").trim();
+    const qtyNum = qtyStr === "" ? NaN : Number(qtyStr);
+    if (Number.isNaN(qtyNum)) {
+        errors.quantity = "Quantity must be a whole number.";
+    } else if (!Number.isInteger(qtyNum)) {
+        errors.quantity = "Quantity must be a whole number.";
+    } else if (qtyNum < 0) {
+        errors.quantity = "Quantity can't be negative.";
+    } else if (qtyNum > 999999999) {
+        errors.quantity = "Quantity can't exceed 999999999.";
+    }
+
+    const priceStr = String(row.price ?? "").trim();
+    const priceNum = priceStr === "" ? NaN : Number(priceStr);
+    if (Number.isNaN(priceNum)) {
+        errors.price = "Price must be a number.";
+    } else if (priceNum < 0) {
+        errors.price = "Price can't be negative.";
+    } else if (priceNum > 999999999) {
+        errors.price = "Price can't exceed 999999999.";
+    }
+
+    return errors;
+}
+
+function showImportReview()
+{
+    document.getElementById("importStepUpload").style.display = "none";
+    document.getElementById("importStepReview").style.display = "block";
+    renderImportReviewTable();
+}
+
+function renderImportReviewTable()
+{
+    const tbody = document.getElementById("importReviewBody");
+    tbody.innerHTML = "";
+
+    importRows.forEach((row, idx) => {
+        const tr = document.createElement("tr");
+
+        const rowNumCell = document.createElement("td");
+        rowNumCell.className = "import-row-num";
+        rowNumCell.textContent = row.row_number ?? (idx + 2);
+        tr.appendChild(rowNumCell);
+
+        ["name", "category", "quantity", "price"].forEach((field) => {
+            const td = document.createElement("td");
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "import-cell-input";
+            input.value = row[field] ?? "";
+            input.addEventListener("input", () => {
+                row[field] = input.value;
+                updateImportRowValidity(idx);
+            });
+            td.appendChild(input);
+
+            const errEl = document.createElement("span");
+            errEl.className = "import-cell-error";
+            td.appendChild(errEl);
+
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    importRows.forEach((_, idx) => updateImportRowValidity(idx));
+}
+
+function updateImportRowValidity(idx)
+{
+    const row = importRows[idx];
+    row.errors = validateImportRowClient(row);
+
+    const tr = document.getElementById("importReviewBody").children[idx];
+    const fields = ["name", "category", "quantity", "price"];
+
+    fields.forEach((field, fieldIdx) => {
+        const td = tr.children[fieldIdx + 1];
+        const input = td.querySelector(".import-cell-input");
+        const errEl = td.querySelector(".import-cell-error");
+        const message = row.errors[field];
+
+        input.classList.toggle("has-error", !!message);
+        errEl.textContent = message || "";
+    });
+
+    updateImportSummaryAndConfirmState();
+}
+
+function updateImportSummaryAndConfirmState()
+{
+    const totalRows = importRows.length;
+    const invalidCount = importRows.filter(r => Object.keys(r.errors || {}).length > 0).length;
+
+    document.getElementById("importReviewSummary").textContent =
+        invalidCount === 0
+            ? `${totalRows} row${totalRows !== 1 ? "s" : ""} ready to import.`
+            : `${totalRows} row${totalRows !== 1 ? "s" : ""} found — ${invalidCount} need${invalidCount === 1 ? "s" : ""} a fix before importing.`;
+
+    const nextBtn = document.getElementById("importNextBtn");
+    const hint = document.getElementById("importConfirmHint");
+    nextBtn.disabled = invalidCount > 0;
+    hint.textContent = invalidCount > 0 ? "Fix the highlighted cells to continue." : "";
+}
+
+function goToImportReviewStep()
+{
+    document.getElementById("importStepImages").style.display = "none";
+    document.getElementById("importStepReview").style.display = "block";
+}
+
+// Holds the chosen File object per row index for the images step. Kept
+// separate from importRows since File objects shouldn't be serialized
+// along with the row data sent to /lookup-existing.
+let importImageFiles = {};
+
+function goToImportImagesStep()
+{
+    const invalidCount = importRows.filter(r => Object.keys(r.errors || {}).length > 0).length;
+    if (invalidCount > 0) return;
+
+    const nextBtn = document.getElementById("importNextBtn");
+    nextBtn.disabled = true;
+    nextBtn.textContent = "Loading...";
+
+    fetch("/inventory/import/lookup-existing", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken(),
+        },
+        body: JSON.stringify({
+            rows: importRows.map(r => ({ name: r.name })),
+        }),
+    })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            nextBtn.disabled = false;
+            nextBtn.textContent = "Next →";
+
+            if (!ok) {
+                document.getElementById("importConfirmHint").textContent =
+                    data.error || "Couldn't check existing items. Please try again.";
+                return;
+            }
+
+            data.rows.forEach((info, idx) => {
+                importRows[idx].existing_item_id = info.existing_item_id;
+                importRows[idx].existing_image_filename = info.existing_image_filename;
+            });
+
+            document.getElementById("importStepReview").style.display = "none";
+            document.getElementById("importStepImages").style.display = "block";
+            renderImportImagesTable();
+        })
+        .catch(() => {
+            nextBtn.disabled = false;
+            nextBtn.textContent = "Next →";
+            document.getElementById("importConfirmHint").textContent = "Couldn't reach the server. Please try again.";
+        });
+}
+
+function renderImportImagesTable()
+{
+    const tbody = document.getElementById("importImagesBody");
+    tbody.innerHTML = "";
+    importImageFiles = {};
+
+    importRows.forEach((row, idx) => {
+        const tr = document.createElement("tr");
+
+        const nameCell = document.createElement("td");
+        nameCell.textContent = row.name;
+        tr.appendChild(nameCell);
+
+        const imageCell = document.createElement("td");
+
+        if (row.existing_image_filename) {
+            const currentLabel = document.createElement("div");
+            currentLabel.className = "import-row-num";
+            currentLabel.style.marginBottom = "4px";
+            currentLabel.textContent = `Current: ${row.existing_image_filename}`;
+            imageCell.appendChild(currentLabel);
+        }
+
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".jpg,.jpeg,.png";
+        fileInput.title = row.existing_image_filename ? "Replace image (optional)" : "Add image (optional)";
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files.length) {
+                importImageFiles[idx] = fileInput.files[0];
+            } else {
+                delete importImageFiles[idx];
+            }
+        });
+        imageCell.appendChild(fileInput);
+
+        tr.appendChild(imageCell);
+        tbody.appendChild(tr);
+    });
+}
+
+function commitImport()
+{
+    const invalidCount = importRows.filter(r => Object.keys(r.errors || {}).length > 0).length;
+    if (invalidCount > 0) return;
+
+    const commitBtn = document.getElementById("importCommitBtn");
+    commitBtn.disabled = true;
+    commitBtn.textContent = "Importing...";
+
+    const formData = new FormData();
+    formData.append("rows_json", JSON.stringify(importRows.map(r => ({
+        name: r.name,
+        category: r.category,
+        quantity: r.quantity,
+        price: r.price,
+    }))));
+    Object.keys(importImageFiles).forEach((idx) => {
+        formData.append(`image_${idx}`, importImageFiles[idx]);
+    });
+
+    fetch("/inventory/import/commit", {
+        method: "POST",
+        headers: { "X-CSRFToken": csrfToken() },
+        body: formData,
+    })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) {
+                // Server found something the client-side check missed - show
+                // it on the review step and let the person fix it rather
+                // than losing their work (including any images already
+                // chosen, which stay intact since importImageFiles is
+                // untouched here).
+                if (data.rows) {
+                    importRows = data.rows.map((r, i) => ({
+                        ...r,
+                        existing_item_id: importRows[i]?.existing_item_id,
+                        existing_image_filename: importRows[i]?.existing_image_filename,
+                    }));
+                }
+                document.getElementById("importStepImages").style.display = "none";
+                document.getElementById("importStepReview").style.display = "block";
+                renderImportReviewTable();
+                document.getElementById("importConfirmHint").textContent =
+                    data.error || "Import failed - please review the highlighted rows.";
+                commitBtn.disabled = false;
+                commitBtn.textContent = "Import Items";
+                return;
+            }
+            window.location.reload();
+        })
+        .catch(() => {
+            document.getElementById("importImagesHint").textContent = "Couldn't reach the server. Please try again.";
+            commitBtn.disabled = false;
+            commitBtn.textContent = "Import Items";
+        });
+}
 </script>
 
 {% endblock %}

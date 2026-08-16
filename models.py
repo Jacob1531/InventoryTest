@@ -2,6 +2,10 @@ from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime
 from sqlalchemy.sql import func
 from db import Base
 
+# Hard ceiling on quantity/price magnitude, shared by every entry point
+# that writes these fields (single-item add/edit, and bulk Excel import).
+MAX_NUMERIC_VALUE = 999999999
+
 
 class Inventory(Base):
     __tablename__ = "inventory"

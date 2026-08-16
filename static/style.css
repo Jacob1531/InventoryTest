@@ -608,6 +608,60 @@ input[type="file"] {
     margin-bottom: 12px;
 }
 
+.import-modal-content {
+    width: 720px;
+}
+
+.import-review-wrap {
+    max-height: 360px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+}
+
+.import-review-wrap table {
+    margin: 0;
+}
+
+.import-review-wrap thead th {
+    position: sticky;
+    top: 0;
+}
+
+.import-cell-input {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.import-cell-input.has-error {
+    border-color: var(--danger);
+    background: var(--danger-bg);
+}
+
+.import-cell-error {
+    display: block;
+    font-size: 11px;
+    color: var(--danger);
+    margin-top: 3px;
+}
+
+.import-error-text {
+    font-size: 13px;
+    color: var(--danger);
+}
+
+.import-row-num {
+    color: var(--text-faint);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
 .close {
     float: right;
     cursor: pointer;
@@ -765,6 +819,11 @@ input[type="file"] {
 .badge-delete {
     background-color: var(--danger-bg);
     color: var(--danger);
+}
+
+.badge-bulk_upload {
+    background-color: #f5f3ff;
+    color: #6d28d9;
 }
 
 .badge-low {

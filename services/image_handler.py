@@ -40,3 +40,20 @@ def upload_inventory_image(file):
     blob_client.upload_blob(file, overwrite=True)
 
     return blob_path
+
+
+def display_filename(blob_path):
+    """Strips the 'images/<uuid>_' prefix off a stored blob path so the
+    person reviewing an import sees the original filename they uploaded,
+    not an internal storage path."""
+    if not blob_path:
+        return None
+    name = blob_path.rsplit("/", 1)[-1]
+    return name.split("_", 1)[-1] if "_" in name else name
+
+
+ALLOWED_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg")
+
+
+def is_valid_image_filename(filename):
+    return bool(filename) and filename.lower().endswith(ALLOWED_IMAGE_EXTENSIONS)
