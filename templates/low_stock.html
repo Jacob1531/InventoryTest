@@ -30,7 +30,7 @@
                 <th>Price</th>
                 <th>Status</th>
                 <th>On Order</th>
-                <th class="no-export"></th>
+                {% if can_order %}<th class="no-export"></th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -49,9 +49,11 @@
                     {% endif %}
                 </td>
                 <td>{{ item.on_order if item.on_order else "-" }}</td>
+                {% if can_order %}
                 <td>
                     <button type="button" class="btn btn-secondary" data-id="{{ item.id }}" data-name="{{ item.name }}" onclick="openOrderModal(this)">Place Order</button>
                 </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody>

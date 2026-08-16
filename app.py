@@ -57,6 +57,20 @@ def require_database_settings_access(view_func):
         return view_func(*args, **kwargs)
     return wrapped
 
+
+def can_place_orders():
+    """True if the signed-in user is allowed to place orders - i.e. NOT a
+    member of the basic-permissions group. Unlike Database Settings, this
+    doesn't block viewing anything, only the ability to create a new
+    order; Orders, Inventory, and Low Stock stay fully viewable either
+    way. Fails CLOSED, same reasoning as Database Settings: any error
+    checking membership is treated as 'cannot place orders'."""
+    try:
+        return not is_basic_permissions_user(get_user_id())
+    except GroupCheckError as e:
+        print(f"Order-placement permission check failed, denying: {e}")
+        return False
+
 # All timestamps are stored naive/UTC (Postgres server default). This
 # converts them to US Eastern (auto-adjusts for EST/EDT) for display only.
 _UTC = ZoneInfo("UTC")
@@ -176,11 +190,19 @@ def low_stock_items():
         item.on_order = on_order_totals.get(item.id, 0)
 
     db.close()
-    return render_template("low_stock.html", items=items, title="Low Stock Items")
+    return render_template(
+        "low_stock.html",
+        items=items,
+        title="Low Stock Items",
+        can_order=can_place_orders(),
+    )
 
 
 @app.route("/inventory/order/<int:item_id>", methods=["POST"])
 def place_order(item_id):
+    if not can_place_orders():
+        return "You don't have permission to place orders.", 403
+
     db = SessionLocal()
     try:
         item = db.query(Inventory).filter(Inventory.id == item_id, Inventory.is_active == True).first()
@@ -407,7 +429,12 @@ def inventory():
         item.on_order = on_order_totals.get(item.id, 0)
 
     db.close()
-    return render_template("inventory.html", items=items, title="Inventory")
+    return render_template(
+        "inventory.html",
+        items=items,
+        title="Inventory",
+        can_order=can_place_orders(),
+    )
 
 
 @app.route("/inventory/update", methods=["POST"])
@@ -799,6 +826,15 @@ def delete_inventory(item_id):
 
         # Soft delete
         item.is_active = False
+
+        # A pending order for this item no longer makes sense once it's
+        # deleted - without this, "receive" would still find the item row
+        # (it's soft-deleted, not gone) and silently add stock to an item
+        # nobody can see or use anymore.
+        db.query(InventoryOrder).filter(
+            InventoryOrder.item_id == item.id,
+            InventoryOrder.status == "PENDING",
+        ).update({"status": "CANCELLED"}, synchronize_session=False)
 
         audit = InventoryAudit(
             item_id=str(item.id),

@@ -45,7 +45,16 @@ class GroupCheckError(Exception):
 def is_basic_permissions_user(user_object_id):
     """Returns True if the given Entra object ID belongs (directly, or
     via a nested group) to the basic-permissions group. Raises
-    GroupCheckError if this can't be determined - see class docstring."""
+    GroupCheckError if this can't be determined - see class docstring.
+
+    Everything Graph-related is wrapped in one broad except below. This
+    matters: get_graph_token() can raise a plain RuntimeError (cert
+    load failure, MSAL failure), the network call itself can raise a
+    connection/timeout error, and a malformed response can fail to
+    parse as JSON - none of those are GroupCheckError on their own. If
+    they weren't caught here, they'd propagate straight out as an
+    unhandled 500 on whatever page triggered the check (Inventory,
+    Settings, etc.) instead of failing closed the way callers expect."""
     if not BASIC_PERMISSIONS_GROUP_ID:
         raise GroupCheckError(
             "ENTRA_BASIC_PERMISSIONS_GROUP_ID is not configured."
@@ -57,17 +66,23 @@ def is_basic_permissions_user(user_object_id):
     if not user_object_id:
         raise GroupCheckError("No signed-in user object ID available to check.")
 
-    token = get_graph_token()
+    try:
+        token = get_graph_token()
 
-    url = f"{GRAPH_BASE}/users/{user_object_id}/checkMemberGroups"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    body = {"groupIds": [BASIC_PERMISSIONS_GROUP_ID]}
+        url = f"{GRAPH_BASE}/users/{user_object_id}/checkMemberGroups"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        body = {"groupIds": [BASIC_PERMISSIONS_GROUP_ID]}
 
-    resp = request_with_retry("POST", url, headers=headers, json=body)
-    if not resp.ok:
-        raise GroupCheckError(
-            f"Graph membership check failed: {resp.status_code} {resp.text}"
-        )
+        resp = request_with_retry("POST", url, headers=headers, json=body)
+        if not resp.ok:
+            raise GroupCheckError(
+                f"Graph membership check failed: {resp.status_code} {resp.text}"
+            )
 
-    matched_group_ids = resp.json().get("value", [])
+        matched_group_ids = resp.json().get("value", [])
+    except GroupCheckError:
+        raise
+    except Exception as e:
+        raise GroupCheckError(f"Graph membership check failed: {e}")
+
     return BASIC_PERMISSIONS_GROUP_ID in matched_group_ids
