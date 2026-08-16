@@ -26,6 +26,10 @@
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Import from Excel
         </button>
+        <a href="{{ url_for('inventory_orders') }}" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            View Orders
+        </a>
     </div>
 </div>
 
@@ -55,7 +59,21 @@
                 <span class="item-qty">Qty: <strong>{{ item.quantity }}</strong></span>
                 <span class="item-price">${{ item.price }}</span>
             </div>
+            {% if item.on_order and item.on_order > 0 %}
+            <div class="on-order-badge">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                {{ item.on_order }} on order
+            </div>
+            {% endif %}
             <div class="item-actions">
+                <button
+                    class="icon-btn order-btn"
+                    title="Place order"
+                    data-id="{{ item.id }}"
+                    data-name="{{ item.name }}"
+                    onclick="openOrderModal(this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                </button>
                 <button
                     class="icon-btn edit-btn"
                     title="Edit item"

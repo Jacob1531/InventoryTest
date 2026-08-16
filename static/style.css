@@ -407,10 +407,30 @@ button {
     background: var(--info-bg);
 }
 
+.icon-btn.order-btn:hover {
+    color: #6d28d9;
+    border-color: #6d28d9;
+    background: #f5f3ff;
+}
+
 .icon-btn.delete-btn:hover {
     color: var(--danger);
     border-color: var(--danger);
     background: var(--danger-bg);
+}
+
+.on-order-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: fit-content;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--info);
+    background: var(--info-bg);
+    border-radius: 20px;
+    padding: 2px 9px;
+    margin-top: 2px;
 }
 
 /* ==========================================================================
@@ -884,6 +904,21 @@ input[type="number"].has-error {
 .badge-purge {
     background-color: #fdf2f8;
     color: #be185d;
+}
+
+.badge-pending {
+    background-color: var(--info-bg);
+    color: var(--info);
+}
+
+.badge-received {
+    background-color: var(--success-bg);
+    color: var(--success);
+}
+
+.badge-cancelled {
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
 }
 
 .badge-low {

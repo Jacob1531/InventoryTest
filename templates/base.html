@@ -22,6 +22,7 @@
     <script src="{{ url_for('static', filename='js/export.js') }}"></script>
     <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/order.js') }}"></script>
 </head>
 <body>
 
@@ -53,6 +54,34 @@
 <main class="content">
     {% block content %}{% endblock %}
 </main>
+
+<div id="orderModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeOrderModal()">&times;</span>
+        <h2>Place Order</h2>
+        <p class="panel-subtitle" id="orderModalItemName"></p>
+        <form id="orderForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p id="orderFormError" class="form-error-banner" style="display:none;"></p>
+            <div class="field">
+                <label for="orderQuantity">Quantity</label>
+                <input type="number" id="orderQuantity" name="quantity" min="1" required>
+                <span class="field-error" id="orderQuantityError"></span>
+            </div>
+            <div class="field">
+                <label for="orderExpectedDate">Expected date (optional)</label>
+                <input type="date" id="orderExpectedDate" name="expected_date">
+            </div>
+            <div class="field">
+                <label for="orderNotes">Notes (optional)</label>
+                <input type="text" id="orderNotes" name="notes" placeholder="PO number, supplier, etc.">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="orderSaveBtn">Place Order</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 </body>
 </html>

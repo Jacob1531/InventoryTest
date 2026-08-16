@@ -29,6 +29,8 @@
                 <th>Threshold</th>
                 <th>Price</th>
                 <th>Status</th>
+                <th>On Order</th>
+                <th class="no-export"></th>
             </tr>
         </thead>
         <tbody>
@@ -45,6 +47,10 @@
                     {% else %}
                         <span class="badge badge-low">Low Stock</span>
                     {% endif %}
+                </td>
+                <td>{{ item.on_order if item.on_order else "-" }}</td>
+                <td>
+                    <button type="button" class="btn btn-secondary" data-id="{{ item.id }}" data-name="{{ item.name }}" onclick="openOrderModal(this)">Place Order</button>
                 </td>
             </tr>
             {% endfor %}

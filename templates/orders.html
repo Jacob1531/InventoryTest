@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('inventory') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Inventory</a>
+
+<div class="page-header">
+    <div>
+        <h2>Orders</h2>
+        <p class="page-subtitle">Stock on order. Marking an order received adds its quantity to the item automatically.</p>
+    </div>
+</div>
+
+{% if orders %}
+<div class="filters">
+    <input type="text" id="ordersSearch" placeholder="Search by item, notes..." onkeyup="filterOrders()" class="search-box">
+    <select id="ordersStatusFilter" onchange="filterOrders()" class="action-filter">
+        <option value="">All Statuses</option>
+        <option value="PENDING">Pending</option>
+        <option value="RECEIVED">Received</option>
+        <option value="CANCELLED">Cancelled</option>
+    </select>
+    <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('ordersTable', 'orders.xlsx')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export to Excel
+    </button>
+</div>
+
+<div class="table-wrap">
+    <table id="ordersTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Quantity</th>
+                <th>Status</th>
+                <th>Ordered By</th>
+                <th>Ordered At</th>
+                <th>Expected Date</th>
+                <th>Notes</th>
+                <th class="no-export"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr data-status="{{ order.status }}">
+                <td>{{ order.item_name }}</td>
+                <td>{{ order.quantity }}</td>
+                <td><span class="badge badge-{{ order.status|lower }}">{{ order.status|title }}</span></td>
+                <td>{{ order.ordered_by }}</td>
+                <td>{{ order.ordered_at_display }}</td>
+                <td>{{ order.expected_date_display or "-" }}</td>
+                <td>{{ order.notes or "-" }}</td>
+                <td>
+                    {% if order.status == "PENDING" %}
+                    <div style="display:flex; gap:6px;">
+                        <form method="POST" action="{{ url_for('receive_order', order_id=order.id) }}"
+                              onsubmit="return confirm('Mark this order received? {{ order.quantity }} will be added to &quot;{{ order.item_name }}&quot;.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-secondary">Mark Received</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('cancel_order', order_id=order.id) }}"
+                              onsubmit="return confirm('Cancel this order?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger-outline">Cancel</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p id="ordersNoResults" class="no-results" style="display:none;">No matching results.</p>
+    <div class="pagination-bar" id="ordersPaginationBar">
+        <span id="ordersPageSummary">Showing 0 of 0</span>
+        <div class="pagination-controls">
+            <label for="ordersPerPageSelect" style="margin-right:2px;">Rows per page:</label>
+            <select id="ordersPerPageSelect" class="per-page-select" onchange="changeOrdersPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button type="button" class="page-nav-btn" id="ordersPrevBtn" onclick="goToOrdersPage(-1)" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-indicator" id="ordersPageIndicator">Page 1 of 1</span>
+            <button type="button" class="page-nav-btn" id="ordersNextBtn" onclick="goToOrdersPage(1)" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let ordersCurrentPage = 1;
+let ordersPerPage = 25;
+
+function filterOrders()
+{
+    const searchInput = document.getElementById("ordersSearch").value.toLowerCase();
+    const statusInput = document.getElementById("ordersStatusFilter").value;
+    const rows = document.querySelectorAll("#ordersTable tbody tr");
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const matchesSearch = text.includes(searchInput);
+        const matchesStatus = statusInput === "" || row.dataset.status === statusInput;
+        row.dataset.filterMatch = (matchesSearch && matchesStatus) ? "true" : "false";
+    });
+
+    ordersCurrentPage = 1;
+    renderOrdersPage();
+}
+
+function changeOrdersPageSize(value)
+{
+    ordersPerPage = parseInt(value, 10);
+    ordersCurrentPage = 1;
+    renderOrdersPage();
+}
+
+function goToOrdersPage(delta)
+{
+    ordersCurrentPage += delta;
+    renderOrdersPage();
+}
+
+function renderOrdersPage()
+{
+    const allRows = Array.from(document.querySelectorAll("#ordersTable tbody tr"));
+    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
+    const totalFiltered = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / ordersPerPage));
+
+    if (ordersCurrentPage > totalPages) ordersCurrentPage = totalPages;
+    if (ordersCurrentPage < 1) ordersCurrentPage = 1;
+
+    const startIdx = (ordersCurrentPage - 1) * ordersPerPage;
+    const endIdx = startIdx + ordersPerPage;
+
+    allRows.forEach(row => {
+        if (row.dataset.filterMatch === "false") {
+            row.style.display = "none";
+            return;
+        }
+        const idxInFiltered = filteredRows.indexOf(row);
+        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
+        row.style.display = onCurrentPage ? "" : "none";
+    });
+
+    document.getElementById("ordersNoResults").style.display = totalFiltered === 0 ? "block" : "none";
+    document.getElementById("ordersPaginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
+
+    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
+    const rangeEnd = Math.min(endIdx, totalFiltered);
+    document.getElementById("ordersPageSummary").textContent =
+        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
+    document.getElementById("ordersPageIndicator").textContent =
+        `Page ${ordersCurrentPage} of ${totalPages}`;
+
+    document.getElementById("ordersPrevBtn").disabled = ordersCurrentPage <= 1;
+    document.getElementById("ordersNextBtn").disabled = ordersCurrentPage >= totalPages;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("#ordersTable tbody tr").forEach(row => {
+        row.dataset.filterMatch = "true";
+    });
+    renderOrdersPage();
+});
+</script>
+
+{% else %}
+<div class="empty-state">No orders yet. Place one from the Inventory or Low Stock pages.</div>
+{% endif %}
+
+{% endblock %}

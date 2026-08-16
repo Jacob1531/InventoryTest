@@ -10,7 +10,7 @@ from azure.storage.blob import BlobServiceClient
 from sqlalchemy import text, func
 
 from db import SessionLocal, engine
-from models import Inventory, InventoryAudit, MAX_NUMERIC_VALUE
+from models import Inventory, InventoryAudit, InventoryOrder, MAX_NUMERIC_VALUE
 from services.inventory_update import update_inventory_quantity
 from services.image_handler import generate_image_url, upload_inventory_image, display_filename, is_valid_image_filename
 from services.notifications import send_low_stock_email
@@ -166,11 +166,146 @@ def low_stock_items():
         .all()
     )
 
+    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
+    on_order_totals = {}
+    for order in pending_orders:
+        on_order_totals[order.item_id] = on_order_totals.get(order.item_id, 0) + order.quantity
+
     for item in items:
         item.is_out = item.quantity is not None and item.quantity <= 0
+        item.on_order = on_order_totals.get(item.id, 0)
 
     db.close()
     return render_template("low_stock.html", items=items, title="Low Stock Items")
+
+
+@app.route("/inventory/order/<int:item_id>", methods=["POST"])
+def place_order(item_id):
+    db = SessionLocal()
+    try:
+        item = db.query(Inventory).filter(Inventory.id == item_id, Inventory.is_active == True).first()
+        if not item:
+            return "Item not found", 404
+
+        try:
+            quantity = int(request.form.get("quantity"))
+        except (TypeError, ValueError):
+            return "Quantity must be a whole number.", 400
+
+        if quantity <= 0:
+            return "Order quantity must be greater than zero.", 400
+        if quantity > MAX_NUMERIC_VALUE:
+            return f"Order quantity can't exceed {MAX_NUMERIC_VALUE}.", 400
+
+        expected_date_str = request.form.get("expected_date")
+        expected_date = None
+        if expected_date_str:
+            try:
+                expected_date = datetime.strptime(expected_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return "Expected date must be a valid date.", 400
+
+        notes = request.form.get("notes") or None
+
+        order = InventoryOrder(
+            item_id=item.id,
+            quantity=quantity,
+            status="PENDING",
+            ordered_by=get_user(),
+            expected_date=expected_date,
+            notes=notes,
+        )
+        db.add(order)
+        db.commit()
+
+        flash(f'Order placed: {quantity} x "{item.name}".', "success")
+        return redirect(request.referrer or url_for("inventory"))
+
+    except Exception as e:
+        db.rollback()
+        return f"Failed to place order: {str(e)}", 500
+    finally:
+        db.close()
+
+
+@app.route("/inventory/orders")
+def inventory_orders():
+    db = SessionLocal()
+    orders = db.query(InventoryOrder).order_by(InventoryOrder.ordered_at.desc()).all()
+
+    item_names = {item.id: item.name for item in db.query(Inventory).all()}
+    for order in orders:
+        order.item_name = item_names.get(order.item_id, f"Item #{order.item_id} (deleted)")
+        order.ordered_at_display = format_eastern(order.ordered_at, fmt="%Y-%m-%d %I:%M %p %Z")
+        order.received_at_display = format_eastern(order.received_at, fmt="%Y-%m-%d %I:%M %p %Z") if order.received_at else None
+        order.expected_date_display = order.expected_date.strftime("%Y-%m-%d") if order.expected_date else None
+
+    db.close()
+    return render_template("orders.html", orders=orders, title="Orders")
+
+
+@app.route("/inventory/order/<int:order_id>/receive", methods=["POST"])
+def receive_order(order_id):
+    db = SessionLocal()
+    try:
+        order = db.query(InventoryOrder).filter(InventoryOrder.id == order_id).first()
+        if not order:
+            return "Order not found", 404
+        if order.status != "PENDING":
+            return "Only pending orders can be marked received.", 400
+
+        item = db.query(Inventory).filter(Inventory.id == order.item_id).first()
+        if not item:
+            return "The item for this order no longer exists.", 400
+
+        old_quantity = item.quantity
+        item.quantity = (item.quantity or 0) + order.quantity
+
+        order.status = "RECEIVED"
+        order.received_at = datetime.utcnow()
+
+        db.add(InventoryAudit(
+            item_id=str(item.id),
+            action="ORDER_RECEIVED",
+            field_name="quantity",
+            old_value=str(old_quantity),
+            new_value=str(item.quantity),
+            changed_by=get_user(),
+            source="UI",
+        ))
+
+        db.commit()
+        flash(f'Received {order.quantity} x "{item.name}". Quantity updated.', "success")
+        return redirect(url_for("inventory_orders"))
+
+    except Exception as e:
+        db.rollback()
+        return f"Failed to mark order received: {str(e)}", 500
+    finally:
+        db.close()
+
+
+@app.route("/inventory/order/<int:order_id>/cancel", methods=["POST"])
+def cancel_order(order_id):
+    db = SessionLocal()
+    try:
+        order = db.query(InventoryOrder).filter(InventoryOrder.id == order_id).first()
+        if not order:
+            return "Order not found", 404
+        if order.status != "PENDING":
+            return "Only pending orders can be cancelled.", 400
+
+        order.status = "CANCELLED"
+        db.commit()
+
+        flash("Order cancelled.", "success")
+        return redirect(url_for("inventory_orders"))
+
+    except Exception as e:
+        db.rollback()
+        return f"Failed to cancel order: {str(e)}", 500
+    finally:
+        db.close()
 
 
 @app.route("/reports/added-this-week")
@@ -216,6 +351,15 @@ def favicon():
 #        conn.commit()
 #    return "Migration applied"
 
+# ONE-TIME MIGRATION - visit this URL once to create the new inventory_order
+# table (used by the "on order" feature), then DELETE THIS ROUTE. Safe to
+# run more than once if needed - checkfirst=True skips creation if the
+# table already exists rather than erroring.
+@app.route("/create-orders-table")
+def create_orders_table():
+    InventoryOrder.__table__.create(bind=engine, checkfirst=True)
+    return "inventory_order table created (or already existed) - remove this route now."
+
 # ONE-TIME CLEANUP - visit this URL once to remove the "Meme" test item and
 # its audit history, then DELETE THIS ROUTE. It is not gated behind a
 # confirmation step and will silently do nothing if the item is already gone,
@@ -249,13 +393,18 @@ def inventory():
     db = SessionLocal()
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
 
-    
+    # Sum pending order quantity per item, so cards can show "X on order".
+    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
+    on_order_totals = {}
+    for order in pending_orders:
+        on_order_totals[order.item_id] = on_order_totals.get(order.item_id, 0) + order.quantity
+
     for item in items:
         if item.image_blob_path:
             item.image_url = generate_image_url(item.image_blob_path)
         else:
             item.image_url = None
-
+        item.on_order = on_order_totals.get(item.id, 0)
 
     db.close()
     return render_template("inventory.html", items=items, title="Inventory")
