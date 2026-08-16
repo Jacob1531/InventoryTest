@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('dashboard') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Dashboard</a>
+
+<div class="page-header">
+    <div>
+        <h2>Added This Week</h2>
+        <p class="page-subtitle">Items added to inventory in the last 7 days.</p>
+    </div>
+</div>
+
+{% if logs %}
+<div class="filters">
+    <input type="text" id="addedSearch" placeholder="Search by item or user..." onkeyup="filterAdded()" class="search-box">
+    <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('addedTable', 'added-this-week.xlsx')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export to Excel
+    </button>
+</div>
+
+<div class="table-wrap">
+    <table id="addedTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Date/Time</th>
+                <th>Item</th>
+                <th>Added As</th>
+                <th>Changed By</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.changed_at_display }}</td>
+                <td>{{ log.item_name }}</td>
+                <td>{{ log.new_value or "-" }}</td>
+                <td>{{ log.changed_by }}</td>
+                <td>{{ log.source }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p id="addedNoResults" class="no-results" style="display:none;">No matching results.</p>
+    <div class="pagination-bar" id="addedPaginationBar">
+        <span id="addedPageSummary">Showing 0 of 0</span>
+        <div class="pagination-controls">
+            <label for="addedPerPageSelect" style="margin-right:2px;">Rows per page:</label>
+            <select id="addedPerPageSelect" class="per-page-select" onchange="changeAddedPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button type="button" class="page-nav-btn" id="addedPrevBtn" onclick="goToAddedPage(-1)" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-indicator" id="addedPageIndicator">Page 1 of 1</span>
+            <button type="button" class="page-nav-btn" id="addedNextBtn" onclick="goToAddedPage(1)" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let addedCurrentPage = 1;
+let addedPerPage = 25;
+
+function filterAdded()
+{
+    const query = document.getElementById("addedSearch").value.toLowerCase();
+    const rows = document.querySelectorAll("#addedTable tbody tr");
+
+    rows.forEach(row => {
+        const matches = row.textContent.toLowerCase().includes(query);
+        row.dataset.filterMatch = matches ? "true" : "false";
+    });
+
+    addedCurrentPage = 1;
+    renderAddedPage();
+}
+
+function changeAddedPageSize(value)
+{
+    addedPerPage = parseInt(value, 10);
+    addedCurrentPage = 1;
+    renderAddedPage();
+}
+
+function goToAddedPage(delta)
+{
+    addedCurrentPage += delta;
+    renderAddedPage();
+}
+
+function renderAddedPage()
+{
+    const allRows = Array.from(document.querySelectorAll("#addedTable tbody tr"));
+    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
+    const totalFiltered = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / addedPerPage));
+
+    if (addedCurrentPage > totalPages) addedCurrentPage = totalPages;
+    if (addedCurrentPage < 1) addedCurrentPage = 1;
+
+    const startIdx = (addedCurrentPage - 1) * addedPerPage;
+    const endIdx = startIdx + addedPerPage;
+
+    allRows.forEach(row => {
+        if (row.dataset.filterMatch === "false") {
+            row.style.display = "none";
+            return;
+        }
+        const idxInFiltered = filteredRows.indexOf(row);
+        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
+        row.style.display = onCurrentPage ? "" : "none";
+    });
+
+    document.getElementById("addedNoResults").style.display = totalFiltered === 0 ? "block" : "none";
+    document.getElementById("addedPaginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
+
+    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
+    const rangeEnd = Math.min(endIdx, totalFiltered);
+    document.getElementById("addedPageSummary").textContent =
+        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
+    document.getElementById("addedPageIndicator").textContent =
+        `Page ${addedCurrentPage} of ${totalPages}`;
+
+    document.getElementById("addedPrevBtn").disabled = addedCurrentPage <= 1;
+    document.getElementById("addedNextBtn").disabled = addedCurrentPage >= totalPages;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("#addedTable tbody tr").forEach(row => {
+        row.dataset.filterMatch = "true";
+    });
+    renderAddedPage();
+});
+</script>
+
+{% else %}
+<div class="empty-state">Nothing has been added to inventory in the last 7 days.</div>
+{% endif %}
+
+{% endblock %}

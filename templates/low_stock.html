@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('dashboard') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Dashboard</a>
+
+<div class="page-header">
+    <div>
+        <h2>Low Stock Items</h2>
+        <p class="page-subtitle">Active items at or below their configured low-stock threshold.</p>
+    </div>
+</div>
+
+{% if items %}
+<div class="filters">
+    <input type="text" id="lowStockSearch" placeholder="Search by name or category..." onkeyup="filterLowStock()" class="search-box">
+    <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('lowStockTable', 'low-stock-items.xlsx')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export to Excel
+    </button>
+</div>
+
+<div class="table-wrap">
+    <table id="lowStockTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Quantity</th>
+                <th>Threshold</th>
+                <th>Price</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.category }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.low_stock_threshold }}</td>
+                <td>${{ item.price }}</td>
+                <td>
+                    {% if item.is_out %}
+                        <span class="badge badge-out">Out of Stock</span>
+                    {% else %}
+                        <span class="badge badge-low">Low Stock</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p id="lowStockNoResults" class="no-results" style="display:none;">No matching results.</p>
+    <div class="pagination-bar" id="lowStockPaginationBar">
+        <span id="lowStockPageSummary">Showing 0 of 0</span>
+        <div class="pagination-controls">
+            <label for="lowStockPerPageSelect" style="margin-right:2px;">Rows per page:</label>
+            <select id="lowStockPerPageSelect" class="per-page-select" onchange="changeLowStockPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button type="button" class="page-nav-btn" id="lowStockPrevBtn" onclick="goToLowStockPage(-1)" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-indicator" id="lowStockPageIndicator">Page 1 of 1</span>
+            <button type="button" class="page-nav-btn" id="lowStockNextBtn" onclick="goToLowStockPage(1)" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let lowStockCurrentPage = 1;
+let lowStockPerPage = 25;
+
+function filterLowStock()
+{
+    const query = document.getElementById("lowStockSearch").value.toLowerCase();
+    const rows = document.querySelectorAll("#lowStockTable tbody tr");
+
+    rows.forEach(row => {
+        const matches = row.textContent.toLowerCase().includes(query);
+        row.dataset.filterMatch = matches ? "true" : "false";
+    });
+
+    lowStockCurrentPage = 1;
+    renderLowStockPage();
+}
+
+function changeLowStockPageSize(value)
+{
+    lowStockPerPage = parseInt(value, 10);
+    lowStockCurrentPage = 1;
+    renderLowStockPage();
+}
+
+function goToLowStockPage(delta)
+{
+    lowStockCurrentPage += delta;
+    renderLowStockPage();
+}
+
+function renderLowStockPage()
+{
+    const allRows = Array.from(document.querySelectorAll("#lowStockTable tbody tr"));
+    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
+    const totalFiltered = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / lowStockPerPage));
+
+    if (lowStockCurrentPage > totalPages) lowStockCurrentPage = totalPages;
+    if (lowStockCurrentPage < 1) lowStockCurrentPage = 1;
+
+    const startIdx = (lowStockCurrentPage - 1) * lowStockPerPage;
+    const endIdx = startIdx + lowStockPerPage;
+
+    allRows.forEach(row => {
+        if (row.dataset.filterMatch === "false") {
+            row.style.display = "none";
+            return;
+        }
+        const idxInFiltered = filteredRows.indexOf(row);
+        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
+        row.style.display = onCurrentPage ? "" : "none";
+    });
+
+    document.getElementById("lowStockNoResults").style.display = totalFiltered === 0 ? "block" : "none";
+    document.getElementById("lowStockPaginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
+
+    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
+    const rangeEnd = Math.min(endIdx, totalFiltered);
+    document.getElementById("lowStockPageSummary").textContent =
+        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
+    document.getElementById("lowStockPageIndicator").textContent =
+        `Page ${lowStockCurrentPage} of ${totalPages}`;
+
+    document.getElementById("lowStockPrevBtn").disabled = lowStockCurrentPage <= 1;
+    document.getElementById("lowStockNextBtn").disabled = lowStockCurrentPage >= totalPages;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("#lowStockTable tbody tr").forEach(row => {
+        row.dataset.filterMatch = "true";
+    });
+    renderLowStockPage();
+});
+</script>
+
+{% else %}
+<div class="empty-state">Nothing is currently low on stock.</div>
+{% endif %}
+
+{% endblock %}

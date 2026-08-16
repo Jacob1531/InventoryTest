@@ -9,18 +9,18 @@
 </div>
 
 <div class="stats-grid">
-    <div class="stat-card">
+    <a href="{{ url_for('inventory') }}" class="stat-card stat-card-link">
         <div class="stat-value">{{ stats.total_items }}</div>
         <div class="stat-label">Active Items</div>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="{{ url_for('low_stock_items') }}" class="stat-card stat-card-link">
         <div class="stat-value {{ 'stat-alert' if stats.low_stock_count > 0 else '' }}">{{ stats.low_stock_count }}</div>
         <div class="stat-label">Low Stock Items</div>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="{{ url_for('added_this_week_items') }}" class="stat-card stat-card-link">
         <div class="stat-value">{{ stats.added_this_week }}</div>
         <div class="stat-label">Added This Week</div>
-    </div>
+    </a>
 </div>
 
 <div class="dashboard-grid">

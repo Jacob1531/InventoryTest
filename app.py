@@ -69,6 +69,12 @@ def format_audit_value(field_name, value):
     return value
 
 
+def week_ago_cutoff():
+    """Shared 7-day cutoff so the dashboard's 'Added This Week' count and
+    the drill-down page behind it always use the exact same boundary."""
+    return datetime.utcnow() - timedelta(days=7)
+
+
 @app.route("/")
 def dashboard():
     db = SessionLocal()
@@ -82,7 +88,7 @@ def dashboard():
         and item.quantity < item.low_stock_threshold
     )
 
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    week_ago = week_ago_cutoff()
     added_this_week = (
         db.query(InventoryAudit)
         .filter(InventoryAudit.action == "ADD", InventoryAudit.changed_at >= week_ago)
@@ -109,6 +115,52 @@ def dashboard():
     }
 
     return render_template("dashboard.html", title="Dashboard", stats=stats, recent_logs=recent_logs)
+
+
+@app.route("/inventory/low-stock")
+def low_stock_items():
+    db = SessionLocal()
+
+    # Same criteria as the dashboard's "Low Stock Items" count, so the
+    # number on the card always matches what shows up here.
+    items = (
+        db.query(Inventory)
+        .filter(
+            Inventory.is_active == True,
+            Inventory.low_stock_threshold.isnot(None),
+            Inventory.quantity < Inventory.low_stock_threshold,
+        )
+        .order_by(Inventory.quantity.asc())
+        .all()
+    )
+
+    for item in items:
+        item.is_out = item.quantity is not None and item.quantity <= 0
+
+    db.close()
+    return render_template("low_stock.html", items=items, title="Low Stock Items")
+
+
+@app.route("/reports/added-this-week")
+def added_this_week_items():
+    db = SessionLocal()
+
+    # Same cutoff as the dashboard's "Added This Week" count, so the
+    # number on the card always matches what shows up here.
+    logs = (
+        db.query(InventoryAudit)
+        .filter(InventoryAudit.action == "ADD", InventoryAudit.changed_at >= week_ago_cutoff())
+        .order_by(InventoryAudit.changed_at.desc())
+        .all()
+    )
+
+    item_names = {str(item.id): item.name for item in db.query(Inventory).all()}
+    for log in logs:
+        log.item_name = item_names.get(log.item_id, log.item_id)
+        log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
+
+    db.close()
+    return render_template("added_this_week.html", logs=logs, title="Added This Week")
 
 @app.route('/favicon.ico')
 def favicon():
