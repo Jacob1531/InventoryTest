@@ -28,7 +28,7 @@ class InventoryAudit(Base):
 
     audit_id = Column(Integer, primary_key=True)
     item_id = Column(String)
-    action = Column(String)              # ADD, UPDATE, DELETE, BULK_UPLOAD
+    action = Column(String)              # ADD, UPDATE, DELETE, BULK_UPLOAD, PURGE
     field_name = Column(String, nullable=True)
     old_value = Column(String, nullable=True)
     new_value = Column(String, nullable=True)

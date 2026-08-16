@@ -11,6 +11,15 @@
 </div>
 
 <div class="dashboard-grid">
+    {% if db_settings_restricted %}
+    <div class="card card-locked" title="You don't have access to Database Settings">
+        <span class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+        <h2>Database Settings <span class="lock-badge">Restricted</span></h2>
+        <p>You don't have access to this section</p>
+    </div>
+    {% else %}
     <a href="{{ url_for('database_settings') }}" class="card">
         <span class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
@@ -18,6 +27,7 @@
         <h2>Database Settings</h2>
         <p>Configure low-stock thresholds</p>
     </a>
+    {% endif %}
 
     <a href="{{ url_for('account_settings') }}" class="card">
         <span class="card-icon">

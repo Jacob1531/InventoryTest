@@ -52,4 +52,53 @@
 <div class="empty-state">No inventory items to configure yet.</div>
 {% endif %}
 
+<div class="page-header" style="margin-top:36px;">
+    <div>
+        <h2>Inactive Items</h2>
+        <p class="page-subtitle">Items that have been deleted from Inventory but are still stored in the database. Removing them here is permanent and cannot be undone - their history stays in Reports, but the item itself will no longer exist.</p>
+    </div>
+    {% if inactive_items %}
+    <form method="POST" action="{{ url_for('purge_all_inactive_items') }}" style="align-self:center;"
+          onsubmit="return confirm('Permanently delete all {{ inactive_items|length }} inactive item{{ 's' if inactive_items|length != 1 else '' }}? Their history will remain in Reports, but this cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger-outline">Delete All Inactive</button>
+    </form>
+    {% endif %}
+</div>
+
+{% if inactive_items %}
+<div class="table-wrap">
+    <table class="reports-table" id="inactiveItemsTable">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th class="no-export"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inactive_items %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.category }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>${{ item.price }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('purge_inactive_item', item_id=item.id) }}"
+                          onsubmit="return confirm('Permanently delete &quot;{{ item.name }}&quot;? Its history will remain in Reports, but this cannot be undone.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger-outline">Delete Permanently</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">No inactive items right now.</div>
+{% endif %}
+
 {% endblock %}

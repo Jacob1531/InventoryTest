@@ -312,6 +312,38 @@ button {
     line-height: 1.5;
 }
 
+.card-locked {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.card-locked:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border);
+}
+
+.card-locked .card-icon {
+    color: var(--text-faint);
+}
+
+.card-locked h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lock-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
 /* ==========================================================================
    Buttons
    ========================================================================== */
@@ -849,6 +881,11 @@ input[type="number"].has-error {
     color: #6d28d9;
 }
 
+.badge-purge {
+    background-color: #fdf2f8;
+    color: #be185d;
+}
+
 .badge-low {
     background-color: #fffbeb;
     color: #b45309;
@@ -881,6 +918,42 @@ input[type="number"].has-error {
     background: var(--surface);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-lg);
+}
+
+.access-denied-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 48px 32px;
+    text-align: center;
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.access-denied-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--danger-bg);
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 18px;
+}
+
+.access-denied-panel h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: var(--text);
+}
+
+.access-denied-panel p {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
 }
 
 /* ==========================================================================

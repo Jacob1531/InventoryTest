@@ -1,5 +1,6 @@
 import os
 import json
+from functools import wraps
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -14,8 +15,9 @@ from services.inventory_update import update_inventory_quantity
 from services.image_handler import generate_image_url, upload_inventory_image, display_filename, is_valid_image_filename
 from services.notifications import send_low_stock_email
 from services.excel_import import parse_import_file, validate_row, ImportFileError
+from services.group_access import is_basic_permissions_user, GroupCheckError
 
-from auth import get_user
+from auth import get_user, get_user_id
 
 app = Flask(__name__)
 
@@ -31,6 +33,29 @@ def inject_current_user():
     (used by the header's account chip) without passing it through every
     single render_template call."""
     return {"header_user": get_user()}
+
+
+def require_database_settings_access(view_func):
+    """Blocks members of the "basic permissions" Entra ID group from
+    Database Settings and its sub-routes (threshold updates, purging
+    inactive items). Fails CLOSED: if membership can't be reliably
+    determined - missing config, Graph error, no user ID - access is
+    denied rather than silently allowed. That's a deliberate choice: the
+    failure mode of "the restricted group gets in anyway" is worse than
+    "everyone is temporarily blocked until the check works again"."""
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        try:
+            is_basic_permissions = is_basic_permissions_user(get_user_id())
+        except GroupCheckError as e:
+            print(f"Database Settings access check failed, denying access: {e}")
+            return render_template("access_denied.html", reason="check_failed", title="Access Denied"), 403
+
+        if is_basic_permissions:
+            return render_template("access_denied.html", reason="restricted_group", title="Access Denied"), 403
+
+        return view_func(*args, **kwargs)
+    return wrapped
 
 # All timestamps are stored naive/UTC (Postgres server default). This
 # converts them to US Eastern (auto-adjusts for EST/EDT) for display only.
@@ -72,6 +97,16 @@ def week_ago_cutoff():
     return datetime.utcnow() - timedelta(days=7)
 
 
+def resolve_item_name(item_names, item_id):
+    """Looks up an audit row's item name from the current Inventory table.
+    Falls back to a readable placeholder (rather than a bare numeric ID)
+    for items that have since been permanently purged - their audit
+    history is kept, but there's no live row left to resolve the name
+    from, so this keeps that history legible instead of showing "47"."""
+    name = item_names.get(item_id)
+    return name if name is not None else f"Item #{item_id} (deleted)"
+
+
 @app.route("/")
 def dashboard():
     db = SessionLocal()
@@ -100,7 +135,7 @@ def dashboard():
         .all()
     )
     for log in recent_logs:
-        log.item_name = item_names.get(log.item_id, log.item_id)
+        log.item_name = resolve_item_name(item_names, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at)
 
     db.close()
@@ -153,7 +188,7 @@ def added_this_week_items():
 
     item_names = {str(item.id): item.name for item in db.query(Inventory).all()}
     for log in logs:
-        log.item_name = item_names.get(log.item_id, log.item_id)
+        log.item_name = resolve_item_name(item_names, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
 
     db.close()
@@ -651,7 +686,7 @@ def reports():
     }
 
     for log in logs:
-        log.item_name = item_names.get(log.item_id, log.item_id)
+        log.item_name = resolve_item_name(item_names, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
         log.old_value_display = format_audit_value(log.field_name, log.old_value)
         log.new_value_display = format_audit_value(log.field_name, log.new_value)
@@ -683,18 +718,41 @@ def debug_db():
 
 @app.route("/settings")
 def settings():
-    return render_template("settings.html", title="Settings")
+    try:
+        db_settings_restricted = is_basic_permissions_user(get_user_id())
+    except GroupCheckError as e:
+        print(f"Database Settings access check failed on Settings page, showing as restricted: {e}")
+        db_settings_restricted = True
+
+    return render_template(
+        "settings.html",
+        title="Settings",
+        db_settings_restricted=db_settings_restricted,
+    )
 
 
 @app.route("/settings/database")
+@require_database_settings_access
 def database_settings():
     db = SessionLocal()
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
+    inactive_items = (
+        db.query(Inventory)
+        .filter(Inventory.is_active == False)
+        .order_by(Inventory.name.asc())
+        .all()
+    )
     db.close()
-    return render_template("database_settings.html", items=items, title="Database Settings")
+    return render_template(
+        "database_settings.html",
+        items=items,
+        inactive_items=inactive_items,
+        title="Database Settings",
+    )
 
 
 @app.route("/settings/database/update/<int:item_id>", methods=["POST"])
+@require_database_settings_access
 def update_threshold(item_id):
     db = SessionLocal()
     try:
@@ -715,6 +773,77 @@ def update_threshold(item_id):
         db.close()
 
 
+@app.route("/settings/database/purge/<int:item_id>", methods=["POST"])
+@require_database_settings_access
+def purge_inactive_item(item_id):
+    """Permanently deletes a single inactive (already soft-deleted) item.
+    Its audit trail is kept, not deleted, and this action itself is logged
+    as a PURGE entry so there's a record that it happened. Irreversible -
+    unlike the normal delete flow, there is no is_active flag to flip back."""
+    db = SessionLocal()
+    try:
+        item = db.query(Inventory).filter(Inventory.id == item_id).first()
+        if not item:
+            return "Item not found", 404
+        if item.is_active:
+            return "Only inactive (already deleted) items can be permanently removed.", 400
+
+        name = item.name
+        db.add(InventoryAudit(
+            item_id=str(item.id),
+            action="PURGE",
+            field_name=None,
+            old_value=None,
+            new_value=name,
+            changed_by=get_user(),
+            source="UI",
+        ))
+        db.delete(item)
+        db.commit()
+
+        flash(f'"{name}" was permanently removed.', "success")
+        return redirect(url_for("database_settings"))
+    except Exception as e:
+        db.rollback()
+        return f"Failed to remove item: {str(e)}", 500
+    finally:
+        db.close()
+
+
+@app.route("/settings/database/purge-all-inactive", methods=["POST"])
+@require_database_settings_access
+def purge_all_inactive_items():
+    """Permanently deletes every inactive item in one transaction - all or
+    nothing. Audit trails are kept, and each removal is itself logged as a
+    PURGE entry."""
+    db = SessionLocal()
+    try:
+        inactive_items = db.query(Inventory).filter(Inventory.is_active == False).all()
+        count = len(inactive_items)
+        remover = get_user()
+
+        for item in inactive_items:
+            db.add(InventoryAudit(
+                item_id=str(item.id),
+                action="PURGE",
+                field_name=None,
+                old_value=None,
+                new_value=item.name,
+                changed_by=remover,
+                source="UI",
+            ))
+            db.delete(item)
+
+        db.commit()
+        flash(f"Permanently removed {count} inactive item{'s' if count != 1 else ''}.", "success")
+        return redirect(url_for("database_settings"))
+    except Exception as e:
+        db.rollback()
+        return f"Failed to remove inactive items: {str(e)}", 500
+    finally:
+        db.close()
+
+
 @app.route("/settings/account")
 def account_settings():
     current_user = get_user()
@@ -728,7 +857,7 @@ def account_settings():
         .all()
     )
     for log in my_logs:
-        log.item_name = item_names.get(log.item_id, log.item_id)
+        log.item_name = resolve_item_name(item_names, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
         log.old_value_display = format_audit_value(log.field_name, log.old_value)
         log.new_value_display = format_audit_value(log.field_name, log.new_value)
