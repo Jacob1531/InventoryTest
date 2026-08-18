@@ -2,7 +2,6 @@ import os
 import json
 from functools import wraps
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from flask import (Flask, flash, redirect, render_template, request, send_from_directory, url_for)
 from flask_wtf.csrf import CSRFProtect
@@ -16,6 +15,8 @@ from services.image_handler import generate_image_url, upload_inventory_image, d
 from services.notifications import send_low_stock_email
 from services.excel_import import parse_import_file, validate_row, ImportFileError
 from services.group_access import is_basic_permissions_user, GroupCheckError
+from services.order_logic import compute_on_order_totals
+from services.audit_helpers import format_eastern, format_audit_value, week_ago_cutoff, resolve_item_name
 
 from auth import get_user, get_user_id
 
@@ -70,55 +71,6 @@ def can_place_orders():
     except GroupCheckError as e:
         print(f"Order-placement permission check failed, denying: {e}")
         return False
-
-# All timestamps are stored naive/UTC (Postgres server default). This
-# converts them to US Eastern (auto-adjusts for EST/EDT) for display only.
-_UTC = ZoneInfo("UTC")
-_EASTERN = ZoneInfo("America/New_York")
-
-
-def format_eastern(dt, fmt="%b %d, %I:%M %p %Z"):
-    if dt is None:
-        return ""
-    return dt.replace(tzinfo=_UTC).astimezone(_EASTERN).strftime(fmt)
-
-
-# Only these audit fields are ever truly numeric - scoping the scientific
-# notation formatting to just these avoids misformatting something like an
-# item name or category that happens to be a numeric-looking string.
-_NUMERIC_AUDIT_FIELDS = {"quantity", "price"}
-
-
-def format_audit_value(field_name, value):
-    """Display-only formatting: values stored in the DB are never touched.
-    Any quantity/price value beyond +/-999999 is shown in scientific
-    notation so a bad input (accidental or otherwise) can't blow out the
-    Reports table's layout."""
-    if value is None or field_name not in _NUMERIC_AUDIT_FIELDS:
-        return value
-    try:
-        num = float(value)
-    except (TypeError, ValueError):
-        return value
-    if abs(num) > 999999:
-        return f"{num:.2e}"
-    return value
-
-
-def week_ago_cutoff():
-    """Shared 7-day cutoff so the dashboard's 'Added This Week' count and
-    the drill-down page behind it always use the exact same boundary."""
-    return datetime.utcnow() - timedelta(days=7)
-
-
-def resolve_item_name(item_names, item_id):
-    """Looks up an audit row's item name from the current Inventory table.
-    Falls back to a readable placeholder (rather than a bare numeric ID)
-    for items that have since been permanently purged - their audit
-    history is kept, but there's no live row left to resolve the name
-    from, so this keeps that history legible instead of showing "47"."""
-    name = item_names.get(item_id)
-    return name if name is not None else f"Item #{item_id} (deleted)"
 
 
 @app.route("/")
@@ -181,9 +133,7 @@ def low_stock_items():
     )
 
     pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
-    on_order_totals = {}
-    for order in pending_orders:
-        on_order_totals[order.item_id] = on_order_totals.get(order.item_id, 0) + order.quantity
+    on_order_totals = compute_on_order_totals(pending_orders)
 
     for item in items:
         item.is_out = item.quantity is not None and item.quantity <= 0
@@ -373,41 +323,42 @@ def favicon():
 #        conn.commit()
 #    return "Migration applied"
 
-# ONE-TIME MIGRATION - visit this URL once to create the new inventory_order
-# table (used by the "on order" feature), then DELETE THIS ROUTE. Safe to
-# run more than once if needed - checkfirst=True skips creation if the
-# table already exists rather than erroring.
-@app.route("/create-orders-table")
-def create_orders_table():
-    InventoryOrder.__table__.create(bind=engine, checkfirst=True)
-    return "inventory_order table created (or already existed) - remove this route now."
-
-# ONE-TIME CLEANUP - visit this URL once to remove the "Meme" test item and
-# its audit history, then DELETE THIS ROUTE. It is not gated behind a
-# confirmation step and will silently do nothing if the item is already gone,
-# so there's no harm in it lingering briefly, but it shouldn't ship in the
-# app long-term - it's a maintenance action, not a feature.
-@app.route("/cleanup-meme-item")
-def cleanup_meme_item():
+# ONE-TIME MIGRATION - visit this URL once to add indexes matching the
+# query patterns across Inventory/Reports/Orders (see models.py's
+# __table_args__ for the reasoning behind each one), then DELETE THIS
+# ROUTE. Safe to run more than once - IF NOT EXISTS skips anything
+# already created rather than erroring. Existing tables aren't touched
+# by Base.metadata.create_all(), which only creates missing tables, so
+# this is needed to apply new indexes to tables that already exist.
+@app.route("/create-indexes-once")
+def create_indexes_once():
+    statements = [
+        "CREATE INDEX IF NOT EXISTS ix_inventory_is_active ON inventory (is_active)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_name_lower ON inventory (lower(name))",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_item_id ON inventory_audit (item_id)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_changed_at ON inventory_audit (changed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_changed_by_changed_at ON inventory_audit (changed_by, changed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_action_changed_at ON inventory_audit (action, changed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_order_status ON inventory_order (status)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_order_ordered_at ON inventory_order (ordered_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_order_item_status ON inventory_order (item_id, status)",
+    ]
     with engine.connect() as conn:
-        conn.execute(text(
-            "DELETE FROM inventory_audit WHERE item_id IN "
-            "(SELECT id::text FROM inventory WHERE name = :name)"
-        ), {"name": "Meme"})
-        conn.execute(text(
-            "DELETE FROM inventory WHERE name = :name AND is_active = false"
-        ), {"name": "Meme"})
+        for stmt in statements:
+            conn.execute(text(stmt))
         conn.commit()
-    return "Cleanup applied - remove this route now."
+    return f"Created (or confirmed existing) {len(statements)} indexes - remove this route now."
 
-@app.route("/check-schema")
-def check_schema():
-    with engine.connect() as conn:
-        result = conn.execute(text(
-            "SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory'"
-        ))
-        columns = [row[0] for row in result]
-    return {"columns": columns}
+# kept around commented-out in case it's ever useful to check again -
+# uncomment temporarily, then re-comment when done
+#@app.route("/check-schema")
+#def check_schema():
+#    with engine.connect() as conn:
+#        result = conn.execute(text(
+#            "SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory'"
+#        ))
+#        columns = [row[0] for row in result]
+#    return {"columns": columns}
 
 
 @app.route("/inventory")
@@ -417,9 +368,7 @@ def inventory():
 
     # Sum pending order quantity per item, so cards can show "X on order".
     pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
-    on_order_totals = {}
-    for order in pending_orders:
-        on_order_totals[order.item_id] = on_order_totals.get(order.item_id, 0) + order.quantity
+    on_order_totals = compute_on_order_totals(pending_orders)
 
     for item in items:
         if item.image_blob_path:
@@ -879,27 +828,28 @@ def reports():
     db.close()
     return render_template("reports.html", logs=logs, title="Reports")
 
-#for debug purposes. Wont exist for deployment
-@app.route("/debug-db")
-def debug_db():
-    db = SessionLocal()
-    items = db.query(Inventory).all()
-
-    output = []
-    for item in items:
-        output.append({
-            "id": item.id,
-            "name": item.name,
-            "category": item.category,
-            "quantity": item.quantity,
-            "low_stock_threshold": item.low_stock_threshold,
-            "price": item.price,
-            "image": item.image_blob_path,
-            "is_active": item.is_active
-        })
-
-    db.close()
-    return {"items": output}
+# kept around commented-out in case it's ever useful to check again -
+# uncomment temporarily, then re-comment when done
+#@app.route("/debug-db")
+#def debug_db():
+#    db = SessionLocal()
+#    items = db.query(Inventory).all()
+#
+#    output = []
+#    for item in items:
+#        output.append({
+#            "id": item.id,
+#            "name": item.name,
+#            "category": item.category,
+#            "quantity": item.quantity,
+#            "low_stock_threshold": item.low_stock_threshold,
+#            "price": item.price,
+#            "image": item.image_blob_path,
+#            "is_active": item.is_active
+#        })
+#
+#    db.close()
+#    return {"items": output}
 
 @app.route("/settings")
 def settings():
