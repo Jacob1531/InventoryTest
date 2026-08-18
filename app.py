@@ -1,7 +1,7 @@
 import os
 import json
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import (Flask, flash, redirect, render_template, request, send_from_directory, url_for)
 from flask_wtf.csrf import CSRFProtect
@@ -234,7 +234,7 @@ def receive_order(order_id):
         item.quantity = (item.quantity or 0) + order.quantity
 
         order.status = "RECEIVED"
-        order.received_at = datetime.utcnow()
+        order.received_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         db.add(InventoryAudit(
             item_id=str(item.id),

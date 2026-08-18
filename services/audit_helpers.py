@@ -8,7 +8,7 @@ without needing Flask, SQLAlchemy, or a live database - none of these
 functions touch either.
 =====================================================================
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 # All timestamps are stored naive/UTC (Postgres server default). This
@@ -46,8 +46,12 @@ def format_audit_value(field_name, value):
 
 def week_ago_cutoff():
     """Shared 7-day cutoff so the dashboard's 'Added This Week' count and
-    the drill-down page behind it always use the exact same boundary."""
-    return datetime.utcnow() - timedelta(days=7)
+    the drill-down page behind it always use the exact same boundary.
+    Returns a naive datetime (matching how every timestamp in this app is
+    stored) - datetime.now(timezone.utc).replace(tzinfo=None) is the
+    non-deprecated equivalent of datetime.utcnow(), stripped back to
+    naive so it compares cleanly against naive DB columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
 
 
 def resolve_item_name(item_names, item_id):

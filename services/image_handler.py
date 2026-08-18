@@ -1,6 +1,6 @@
 
 from azure.storage.blob import generate_blob_sas, BlobServiceClient
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import uuid
 
@@ -18,7 +18,7 @@ def generate_image_url(blob_path):
         blob_name=blob_path,
         account_key=blob_service.credential.account_key,
         permission="r",
-        expiry=datetime.utcnow() + timedelta(hours=1)
+        expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
     )
 
     return f"https://{account_name}.blob.core.windows.net/inventory-images/{blob_path}?{sas_token}"

@@ -6,7 +6,7 @@ Run with: pytest tests/test_audit_helpers.py
 """
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -88,7 +88,7 @@ def test_negative_large_number_is_converted_too():
 
 def test_week_ago_cutoff_is_seven_days_before_now():
     cutoff = week_ago_cutoff()
-    delta = datetime.utcnow() - cutoff
+    delta = datetime.now(timezone.utc).replace(tzinfo=None) - cutoff
     # Allow a little slack for test execution time itself
     assert 6.99 <= delta.total_seconds() / 86400 <= 7.01
 
