@@ -30,10 +30,10 @@
     <a href="{{ url_for('dashboard') }}" class="brand">
         <img src="{{ url_for('static', filename='diaspora_logo.png') }}" alt="Logo" class="brand-logo">
         <span class="brand-divider"></span>
-        <span class="brand-text">
-            <span class="brand-name">Diaspora Resource Hub</span>
-            <span class="brand-tagline">Inventory &amp; Operations</span>
-        </span>
+    </a>
+    <a href="{{ url_for('dashboard') }}" class="brand-text">
+        <span class="brand-name">Diaspora Resource Hub</span>
+        <span class="brand-tagline">Inventory &amp; Operations</span>
     </a>
     <a href="{{ url_for('account_settings') }}" class="header-account">
         <span class="header-account-avatar">{{ header_user[0]|upper if header_user and header_user != "unknown" else "?" }}</span>
