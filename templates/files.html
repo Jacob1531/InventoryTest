@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('dashboard') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Dashboard</a>
+
+<div class="page-header">
+    <div>
+        <h2>Files</h2>
+        <p class="page-subtitle">Upload and view file submissions.</p>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom:28px;">
+    <h2>Upload a File</h2>
+    <p class="panel-subtitle">Give it a name so it's easy to find later.</p>
+
+    <form id="fileUploadForm" method="POST" action="{{ url_for('upload_file_submission') }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p id="fileUploadError" class="form-error-banner" style="display:none;"></p>
+        <div class="form-grid">
+            <div class="field">
+                <label for="fileSubmissionName">Name</label>
+                <input type="text" id="fileSubmissionName" name="name" placeholder="e.g. Q3 donation report" required>
+                <span class="field-error" id="fileSubmissionNameError"></span>
+            </div>
+            <div class="field">
+                <label for="fileSubmissionFile">File</label>
+                <input type="file" id="fileSubmissionFile" name="file" required>
+                <span class="field-error" id="fileSubmissionFileError"></span>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="fileUploadSaveBtn">Upload</button>
+        </div>
+    </form>
+</div>
+
+{% if submissions %}
+<div class="filters">
+    <input type="text" id="filesSearch" placeholder="Search by name, uploader..." onkeyup="filterFiles()" class="search-box">
+    <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('filesTable', 'files.xlsx')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export to Excel
+    </button>
+</div>
+
+<div class="table-wrap">
+    <table id="filesTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>File</th>
+                <th>Uploaded By</th>
+                <th>Uploaded At</th>
+                <th class="no-export"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for submission in submissions %}
+            <tr>
+                <td>{{ submission.name }}</td>
+                <td>{{ submission.original_filename }}</td>
+                <td>{{ submission.uploaded_by }}</td>
+                <td>{{ submission.uploaded_at_display }}</td>
+                <td>
+                    <a href="{{ submission.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p id="filesNoResults" class="no-results" style="display:none;">No matching results.</p>
+    <div class="pagination-bar" id="filesPaginationBar">
+        <span id="filesPageSummary">Showing 0 of 0</span>
+        <div class="pagination-controls">
+            <label for="filesPerPageSelect" style="margin-right:2px;">Rows per page:</label>
+            <select id="filesPerPageSelect" class="per-page-select" onchange="changeFilesPageSize(this.value)">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button type="button" class="page-nav-btn" id="filesPrevBtn" onclick="goToFilesPage(-1)" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-indicator" id="filesPageIndicator">Page 1 of 1</span>
+            <button type="button" class="page-nav-btn" id="filesNextBtn" onclick="goToFilesPage(1)" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let filesCurrentPage = 1;
+let filesPerPage = 25;
+
+function filterFiles()
+{
+    const query = document.getElementById("filesSearch").value.toLowerCase();
+    const rows = document.querySelectorAll("#filesTable tbody tr");
+
+    rows.forEach(row => {
+        const matches = row.textContent.toLowerCase().includes(query);
+        row.dataset.filterMatch = matches ? "true" : "false";
+    });
+
+    filesCurrentPage = 1;
+    renderFilesPage();
+}
+
+function changeFilesPageSize(value)
+{
+    filesPerPage = parseInt(value, 10);
+    filesCurrentPage = 1;
+    renderFilesPage();
+}
+
+function goToFilesPage(delta)
+{
+    filesCurrentPage += delta;
+    renderFilesPage();
+}
+
+function renderFilesPage()
+{
+    const allRows = Array.from(document.querySelectorAll("#filesTable tbody tr"));
+    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
+    const totalFiltered = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / filesPerPage));
+
+    if (filesCurrentPage > totalPages) filesCurrentPage = totalPages;
+    if (filesCurrentPage < 1) filesCurrentPage = 1;
+
+    const startIdx = (filesCurrentPage - 1) * filesPerPage;
+    const endIdx = startIdx + filesPerPage;
+
+    allRows.forEach(row => {
+        if (row.dataset.filterMatch === "false") {
+            row.style.display = "none";
+            return;
+        }
+        const idxInFiltered = filteredRows.indexOf(row);
+        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
+        row.style.display = onCurrentPage ? "" : "none";
+    });
+
+    document.getElementById("filesNoResults").style.display = totalFiltered === 0 ? "block" : "none";
+    document.getElementById("filesPaginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
+
+    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
+    const rangeEnd = Math.min(endIdx, totalFiltered);
+    document.getElementById("filesPageSummary").textContent =
+        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
+    document.getElementById("filesPageIndicator").textContent =
+        `Page ${filesCurrentPage} of ${totalPages}`;
+
+    document.getElementById("filesPrevBtn").disabled = filesCurrentPage <= 1;
+    document.getElementById("filesNextBtn").disabled = filesCurrentPage >= totalPages;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("#filesTable tbody tr").forEach(row => {
+        row.dataset.filterMatch = "true";
+    });
+    renderFilesPage();
+});
+</script>
+
+{% else %}
+<div class="empty-state">No files uploaded yet.</div>
+{% endif %}
+
+<script>
+function validateFileUploadForm()
+{
+    const nameInput = document.getElementById("fileSubmissionName");
+    const fileInput = document.getElementById("fileSubmissionFile");
+    const nameErr = document.getElementById("fileSubmissionNameError");
+    const fileErr = document.getElementById("fileSubmissionFileError");
+
+    let ok = true;
+
+    if (!nameInput.value.trim()) {
+        nameInput.classList.add("has-error");
+        nameErr.textContent = "Name is required.";
+        ok = false;
+    } else {
+        nameInput.classList.remove("has-error");
+        nameErr.textContent = "";
+    }
+
+    if (!fileInput.files.length) {
+        fileInput.classList.add("has-error");
+        fileErr.textContent = "Choose a file first.";
+        ok = false;
+    } else {
+        fileInput.classList.remove("has-error");
+        fileErr.textContent = "";
+    }
+
+    return ok;
+}
+
+document.getElementById("fileSubmissionName").addEventListener("input", validateFileUploadForm);
+document.getElementById("fileSubmissionFile").addEventListener("change", validateFileUploadForm);
+
+document.getElementById("fileUploadForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    if (!validateFileUploadForm()) return;
+
+    const form = event.target;
+    const saveBtn = document.getElementById("fileUploadSaveBtn");
+    const errorBanner = document.getElementById("fileUploadError");
+    errorBanner.style.display = "none";
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Uploading...";
+
+    fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+    })
+        .then(res => res.text().then(text => ({ ok: res.ok, text })))
+        .then(({ ok, text }) => {
+            if (!ok) {
+                errorBanner.textContent = text || "Upload failed. Please try again.";
+                errorBanner.style.display = "block";
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Upload";
+                return;
+            }
+            window.location.reload();
+        })
+        .catch(() => {
+            errorBanner.textContent = "Couldn't reach the server. Please try again.";
+            errorBanner.style.display = "block";
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Upload";
+        });
+});
+</script>
+
+{% endblock %}

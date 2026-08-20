@@ -72,3 +72,14 @@ class InventoryOrder(Base):
         # pages) and "cancel this item's pending orders" (on delete).
         Index("ix_inventory_order_item_status", "item_id", "status"),
     )
+
+
+class FileSubmission(Base):
+    __tablename__ = "file_submission"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String)                  # descriptive name the uploader typed
+    original_filename = Column(String)     # the actual filename that was uploaded
+    blob_path = Column(String)             # where it lives in Azure Blob Storage
+    uploaded_by = Column(String)
+    uploaded_at = Column(DateTime, server_default=func.now(), index=True)

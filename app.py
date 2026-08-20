@@ -9,7 +9,7 @@ from azure.storage.blob import BlobServiceClient
 from sqlalchemy import text, func
 
 from db import SessionLocal, engine
-from models import Inventory, InventoryAudit, InventoryOrder, MAX_NUMERIC_VALUE
+from models import Inventory, InventoryAudit, InventoryOrder, FileSubmission, MAX_NUMERIC_VALUE
 from services.inventory_update import update_inventory_quantity
 from services.image_handler import generate_image_url, upload_inventory_image, display_filename, is_valid_image_filename
 from services.notifications import send_low_stock_email
@@ -17,6 +17,7 @@ from services.excel_import import parse_import_file, validate_row, ImportFileErr
 from services.group_access import is_basic_permissions_user, GroupCheckError
 from services.order_logic import compute_on_order_totals
 from services.audit_helpers import format_eastern, format_audit_value, week_ago_cutoff, resolve_item_name
+from services.file_handler import upload_submission_file, generate_file_url, is_allowed_submission_filename
 
 from auth import get_user, get_user_id
 
@@ -348,6 +349,15 @@ def create_indexes_once():
             conn.execute(text(stmt))
         conn.commit()
     return f"Created (or confirmed existing) {len(statements)} indexes - remove this route now."
+
+# ONE-TIME MIGRATION - visit this URL once to create the new
+# file_submission table (used by the "Files" feature), then DELETE THIS
+# ROUTE. Safe to run more than once - checkfirst=True skips creation if
+# the table already exists rather than erroring.
+@app.route("/create-files-table-once")
+def create_files_table_once():
+    FileSubmission.__table__.create(bind=engine, checkfirst=True)
+    return "file_submission table created (or already existed) - remove this route now."
 
 # kept around commented-out in case it's ever useful to check again -
 # uncomment temporarily, then re-comment when done
@@ -827,6 +837,54 @@ def reports():
 
     db.close()
     return render_template("reports.html", logs=logs, title="Reports")
+
+
+@app.route("/files")
+def files():
+    db = SessionLocal()
+    submissions = db.query(FileSubmission).order_by(FileSubmission.uploaded_at.desc()).all()
+
+    for submission in submissions:
+        submission.uploaded_at_display = format_eastern(submission.uploaded_at, fmt="%Y-%m-%d %I:%M %p %Z")
+        submission.file_url = generate_file_url(submission.blob_path)
+
+    db.close()
+    return render_template("files.html", submissions=submissions, title="Files")
+
+
+@app.route("/files/upload", methods=["POST"])
+def upload_file_submission():
+    name = request.form.get("name", "").strip()
+    file = request.files.get("file")
+
+    if not name:
+        return "Name is required.", 400
+    if not file or not file.filename:
+        return "A file is required.", 400
+    if not is_allowed_submission_filename(file.filename):
+        return "That file type isn't allowed.", 400
+
+    db = SessionLocal()
+    try:
+        blob_path = upload_submission_file(file)
+
+        submission = FileSubmission(
+            name=name,
+            original_filename=file.filename,
+            blob_path=blob_path,
+            uploaded_by=get_user(),
+        )
+        db.add(submission)
+        db.commit()
+
+        flash(f'"{name}" was uploaded.', "success")
+        return redirect(url_for("files"))
+
+    except Exception as e:
+        db.rollback()
+        return f"Upload failed: {str(e)}", 500
+    finally:
+        db.close()
 
 # kept around commented-out in case it's ever useful to check again -
 # uncomment temporarily, then re-comment when done
