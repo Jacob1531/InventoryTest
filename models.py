@@ -81,5 +81,6 @@ class FileSubmission(Base):
     name = Column(String)                  # descriptive name the uploader typed
     original_filename = Column(String)     # the actual filename that was uploaded
     blob_path = Column(String)             # where it lives in Azure Blob Storage
+    category = Column(String, nullable=True)
     uploaded_by = Column(String)
     uploaded_at = Column(DateTime, server_default=func.now(), index=True)

@@ -14,6 +14,7 @@ image_handler.py).
 =====================================================================
 """
 from azure.storage.blob import generate_blob_sas, BlobServiceClient
+from azure.core.exceptions import ResourceNotFoundError
 from datetime import datetime, timedelta, timezone
 import os
 import uuid
@@ -71,3 +72,22 @@ def generate_file_url(blob_path):
     )
 
     return f"https://{account_name}.blob.core.windows.net/{CONTAINER}/{blob_path}?{sas_token}"
+
+
+def delete_submission_file(blob_path):
+    """Deletes a submission's blob from storage. Treats 'already gone' as
+    success (nothing left to clean up) rather than an error, since the
+    caller's goal - the blob not existing - is already satisfied either
+    way. Any other failure (auth, network) is left to propagate, since
+    the caller should not delete the database row if the blob deletion
+    genuinely failed - that would orphan a blob with no record pointing
+    to it."""
+    connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    blob_service = BlobServiceClient.from_connection_string(connect_str)
+    container_client = blob_service.get_container_client(CONTAINER)
+
+    blob_client = container_client.get_blob_client(blob_path)
+    try:
+        blob_client.delete_blob()
+    except ResourceNotFoundError:
+        pass

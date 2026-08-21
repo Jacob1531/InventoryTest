@@ -17,7 +17,7 @@ from services.excel_import import parse_import_file, validate_row, ImportFileErr
 from services.group_access import is_basic_permissions_user, GroupCheckError
 from services.order_logic import compute_on_order_totals
 from services.audit_helpers import format_eastern, format_audit_value, week_ago_cutoff, resolve_item_name
-from services.file_handler import upload_submission_file, generate_file_url, is_allowed_submission_filename
+from services.file_handler import upload_submission_file, generate_file_url, delete_submission_file, is_allowed_submission_filename
 
 from auth import get_user, get_user_id
 
@@ -27,6 +27,22 @@ app = Flask(__name__)
 # Service configuration (same place as PGUSER/PGPASSWORD/etc).
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 csrf = CSRFProtect(app)
+
+# Applies to every request, not just Files - there was previously no cap
+# anywhere in the app. 25MB comfortably covers normal documents/scans for
+# Files and is far more than inventory images or Excel imports need, so
+# this shouldn't affect any existing upload path.
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+
+
+@app.errorhandler(413)
+def file_too_large(e):
+    # Without this, exceeding MAX_CONTENT_LENGTH would show Werkzeug's raw
+    # default error page - same "never show a raw error page" reasoning
+    # as the fetch-based form submissions elsewhere in the app. The
+    # upload forms already read the response body as plain text on
+    # failure and display it inline, so this renders in place automatically.
+    return "That file is too large. Maximum upload size is 25 MB.", 413
 
 
 @app.context_processor
@@ -71,6 +87,19 @@ def can_place_orders():
         return not is_basic_permissions_user(get_user_id())
     except GroupCheckError as e:
         print(f"Order-placement permission check failed, denying: {e}")
+        return False
+
+
+def can_delete_files():
+    """True if the signed-in user is allowed to delete file submissions -
+    i.e. NOT a member of the basic-permissions group. Uploading and
+    viewing Files stay open to everyone; only the destructive delete
+    action is gated. Fails CLOSED, same reasoning as the other
+    permission checks."""
+    try:
+        return not is_basic_permissions_user(get_user_id())
+    except GroupCheckError as e:
+        print(f"File-deletion permission check failed, denying: {e}")
         return False
 
 
@@ -358,6 +387,16 @@ def create_indexes_once():
 def create_files_table_once():
     FileSubmission.__table__.create(bind=engine, checkfirst=True)
     return "file_submission table created (or already existed) - remove this route now."
+
+# ONE-TIME MIGRATION - visit this URL once to add the new "category" column
+# to file_submission (the table was already created before this column
+# existed), then DELETE THIS ROUTE.
+@app.route("/add-file-category-column-once")
+def add_file_category_column_once():
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE file_submission ADD COLUMN IF NOT EXISTS category VARCHAR"))
+        conn.commit()
+    return "category column added (or already existed) - remove this route now."
 
 # kept around commented-out in case it's ever useful to check again -
 # uncomment temporarily, then re-comment when done
@@ -848,13 +887,22 @@ def files():
         submission.uploaded_at_display = format_eastern(submission.uploaded_at, fmt="%Y-%m-%d %I:%M %p %Z")
         submission.file_url = generate_file_url(submission.blob_path)
 
+    categories = sorted({s.category for s in submissions if s.category})
+
     db.close()
-    return render_template("files.html", submissions=submissions, title="Files")
+    return render_template(
+        "files.html",
+        submissions=submissions,
+        categories=categories,
+        can_delete=can_delete_files(),
+        title="Files",
+    )
 
 
 @app.route("/files/upload", methods=["POST"])
 def upload_file_submission():
     name = request.form.get("name", "").strip()
+    category = request.form.get("category", "").strip() or None
     file = request.files.get("file")
 
     if not name:
@@ -872,6 +920,7 @@ def upload_file_submission():
             name=name,
             original_filename=file.filename,
             blob_path=blob_path,
+            category=category,
             uploaded_by=get_user(),
         )
         db.add(submission)
@@ -883,6 +932,32 @@ def upload_file_submission():
     except Exception as e:
         db.rollback()
         return f"Upload failed: {str(e)}", 500
+    finally:
+        db.close()
+
+
+@app.route("/files/<int:submission_id>/delete", methods=["POST"])
+def delete_file_submission(submission_id):
+    if not can_delete_files():
+        return "You don't have permission to delete files.", 403
+
+    db = SessionLocal()
+    try:
+        submission = db.query(FileSubmission).filter(FileSubmission.id == submission_id).first()
+        if not submission:
+            return "File not found", 404
+
+        name = submission.name
+        delete_submission_file(submission.blob_path)
+        db.delete(submission)
+        db.commit()
+
+        flash(f'"{name}" was deleted.', "success")
+        return redirect(url_for("files"))
+
+    except Exception as e:
+        db.rollback()
+        return f"Failed to delete file: {str(e)}", 500
     finally:
         db.close()
 

@@ -6,13 +6,13 @@
 <div class="page-header">
     <div>
         <h2>Files</h2>
-        <p class="page-subtitle">Upload and view file submissions.</p>
+        <p class="page-subtitle">Upload and view file submissions. Max file size is 25 MB.</p>
     </div>
 </div>
 
 <div class="panel" style="margin-bottom:28px;">
     <h2>Upload a File</h2>
-    <p class="panel-subtitle">Give it a name so it's easy to find later.</p>
+    <p class="panel-subtitle">Give it a name so it's easy to find later. Category is optional.</p>
 
     <form id="fileUploadForm" method="POST" action="{{ url_for('upload_file_submission') }}" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -22,6 +22,15 @@
                 <label for="fileSubmissionName">Name</label>
                 <input type="text" id="fileSubmissionName" name="name" placeholder="e.g. Q3 donation report" required>
                 <span class="field-error" id="fileSubmissionNameError"></span>
+            </div>
+            <div class="field">
+                <label for="fileSubmissionCategory">Category (optional)</label>
+                <input type="text" id="fileSubmissionCategory" name="category" placeholder="e.g. Donation Reports" list="fileCategoryOptions">
+                <datalist id="fileCategoryOptions">
+                    {% for cat in categories %}
+                    <option value="{{ cat }}">
+                    {% endfor %}
+                </datalist>
             </div>
             <div class="field">
                 <label for="fileSubmissionFile">File</label>
@@ -38,6 +47,13 @@
 {% if submissions %}
 <div class="filters">
     <input type="text" id="filesSearch" placeholder="Search by name, uploader..." onkeyup="filterFiles()" class="search-box">
+    <select id="filesCategoryFilter" onchange="filterFiles()" class="action-filter">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}">{{ cat }}</option>
+        {% endfor %}
+        <option value="__none__">Uncategorized</option>
+    </select>
     <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('filesTable', 'files.xlsx')">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export to Excel
@@ -50,6 +66,7 @@
             <tr>
                 <th>Name</th>
                 <th>File</th>
+                <th>Category</th>
                 <th>Uploaded By</th>
                 <th>Uploaded At</th>
                 <th class="no-export"></th>
@@ -57,13 +74,23 @@
         </thead>
         <tbody>
             {% for submission in submissions %}
-            <tr>
+            <tr data-category="{{ submission.category if submission.category else '__none__' }}">
                 <td>{{ submission.name }}</td>
                 <td>{{ submission.original_filename }}</td>
+                <td>{{ submission.category or "-" }}</td>
                 <td>{{ submission.uploaded_by }}</td>
                 <td>{{ submission.uploaded_at_display }}</td>
                 <td>
-                    <a href="{{ submission.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a>
+                    <div style="display:flex; gap:6px;">
+                        <a href="{{ submission.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a>
+                        {% if can_delete %}
+                        <form method="POST" action="{{ url_for('delete_file_submission', submission_id=submission.id) }}"
+                              onsubmit="return confirm('Delete &quot;{{ submission.name }}&quot;? This cannot be undone.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger-outline">Delete</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% endfor %}
@@ -98,11 +125,14 @@ let filesPerPage = 25;
 function filterFiles()
 {
     const query = document.getElementById("filesSearch").value.toLowerCase();
+    const categoryInput = document.getElementById("filesCategoryFilter").value;
     const rows = document.querySelectorAll("#filesTable tbody tr");
 
     rows.forEach(row => {
-        const matches = row.textContent.toLowerCase().includes(query);
-        row.dataset.filterMatch = matches ? "true" : "false";
+        const text = row.textContent.toLowerCase();
+        const matchesSearch = text.includes(query);
+        const matchesCategory = categoryInput === "" || row.dataset.category === categoryInput;
+        row.dataset.filterMatch = (matchesSearch && matchesCategory) ? "true" : "false";
     });
 
     filesCurrentPage = 1;
@@ -172,6 +202,8 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endif %}
 
 <script>
+const MAX_FILE_UPLOAD_BYTES = 25 * 1024 * 1024; // must match app.py's MAX_CONTENT_LENGTH
+
 function validateFileUploadForm()
 {
     const nameInput = document.getElementById("fileSubmissionName");
@@ -193,6 +225,10 @@ function validateFileUploadForm()
     if (!fileInput.files.length) {
         fileInput.classList.add("has-error");
         fileErr.textContent = "Choose a file first.";
+        ok = false;
+    } else if (fileInput.files[0].size > MAX_FILE_UPLOAD_BYTES) {
+        fileInput.classList.add("has-error");
+        fileErr.textContent = "That file is too large. Maximum upload size is 25 MB.";
         ok = false;
     } else {
         fileInput.classList.remove("has-error");
