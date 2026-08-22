@@ -1,0 +1,108 @@
+"""
+main.py
+=====================================================================
+Dashboard, favicon, and one-time database migration routes.
+
+Routes and URLs are unchanged from the pre-blueprint version; only
+their location moved. Endpoint names are now namespaced as
+"main.<function_name>" for url_for().
+=====================================================================
+"""
+from flask import Blueprint, current_app, render_template
+from sqlalchemy import text
+from db import SessionLocal, engine
+from models import FileSubmission, Inventory, InventoryAudit
+from services.audit_helpers import format_eastern, resolve_item_name, week_ago_cutoff
+from permissions import can_view_hardware_warranty
+
+bp = Blueprint("main", __name__)
+
+
+@bp.route("/")
+def dashboard():
+    db = SessionLocal()
+
+    active_items = db.query(Inventory).filter(Inventory.is_active == True).all()
+
+    total_items = len(active_items)
+    low_stock_count = sum(
+        1 for item in active_items
+        if item.low_stock_threshold is not None and item.quantity is not None
+        and item.quantity < item.low_stock_threshold
+    )
+
+    week_ago = week_ago_cutoff()
+    added_this_week = (
+        db.query(InventoryAudit)
+        .filter(InventoryAudit.action == "ADD", InventoryAudit.changed_at >= week_ago)
+        .count()
+    )
+
+    item_names = {str(item.id): item.name for item in db.query(Inventory).all()}
+    recent_logs = (
+        db.query(InventoryAudit)
+        .order_by(InventoryAudit.changed_at.desc())
+        .limit(5)
+        .all()
+    )
+    for log in recent_logs:
+        log.item_name = resolve_item_name(item_names, log.item_id)
+        log.changed_at_display = format_eastern(log.changed_at)
+
+    db.close()
+
+    stats = {
+        "total_items": total_items,
+        "low_stock_count": low_stock_count,
+        "added_this_week": added_this_week,
+    }
+
+    return render_template(
+        "dashboard.html",
+        title="Dashboard",
+        stats=stats,
+        recent_logs=recent_logs,
+        can_view_hardware_warranty=can_view_hardware_warranty(),
+    )
+
+
+@bp.route('/favicon.ico')
+def favicon():
+    # current_app rather than a direct `app` reference: blueprints are
+    # registered onto the app, not the other way around, so importing the
+    # app object here would be a circular import.
+    return current_app.send_static_file('favicon.png')
+
+
+@bp.route("/create-indexes-once")
+def create_indexes_once():
+    statements = [
+        "CREATE INDEX IF NOT EXISTS ix_inventory_is_active ON inventory (is_active)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_name_lower ON inventory (lower(name))",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_item_id ON inventory_audit (item_id)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_changed_at ON inventory_audit (changed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_changed_by_changed_at ON inventory_audit (changed_by, changed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_audit_action_changed_at ON inventory_audit (action, changed_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_order_status ON inventory_order (status)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_order_ordered_at ON inventory_order (ordered_at)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_order_item_status ON inventory_order (item_id, status)",
+    ]
+    with engine.connect() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.commit()
+    return f"Created (or confirmed existing) {len(statements)} indexes - remove this route now."
+
+
+@bp.route("/create-files-table-once")
+def create_files_table_once():
+    FileSubmission.__table__.create(bind=engine, checkfirst=True)
+    return "file_submission table created (or already existed) - remove this route now."
+
+
+@bp.route("/add-file-category-column-once")
+def add_file_category_column_once():
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE file_submission ADD COLUMN IF NOT EXISTS category VARCHAR"))
+        conn.commit()
+    return "category column added (or already existed) - remove this route now."

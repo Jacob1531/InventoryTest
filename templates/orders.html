@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<a href="{{ url_for('inventory') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Inventory</a>
+<a href="{{ url_for('inventory.inventory') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Inventory</a>
 
 <div class="page-header">
     <div>
@@ -52,12 +52,12 @@
                 <td>
                     {% if order.status == "PENDING" %}
                     <div style="display:flex; gap:6px;">
-                        <form method="POST" action="{{ url_for('receive_order', order_id=order.id) }}"
+                        <form method="POST" action="{{ url_for('orders.receive_order', order_id=order.id) }}"
                               onsubmit="return confirm('Mark this order received? {{ order.quantity }} will be added to &quot;{{ order.item_name }}&quot;.');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-secondary">Mark Received</button>
                         </form>
-                        <form method="POST" action="{{ url_for('cancel_order', order_id=order.id) }}"
+                        <form method="POST" action="{{ url_for('orders.cancel_order', order_id=order.id) }}"
                               onsubmit="return confirm('Cancel this order?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger-outline">Cancel</button>

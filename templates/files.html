@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<a href="{{ url_for('dashboard') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Dashboard</a>
+<a href="{{ url_for('main.dashboard') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Dashboard</a>
 
 <div class="page-header">
     <div>
@@ -14,7 +14,7 @@
     <h2>Upload a File</h2>
     <p class="panel-subtitle">Give it a name so it's easy to find later. Category is optional.</p>
 
-    <form id="fileUploadForm" method="POST" action="{{ url_for('upload_file_submission') }}" enctype="multipart/form-data">
+    <form id="fileUploadForm" method="POST" action="{{ url_for('files.upload_file_submission') }}" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <p id="fileUploadError" class="form-error-banner" style="display:none;"></p>
         <div class="form-grid">
@@ -84,7 +84,7 @@
                     <div style="display:flex; gap:6px;">
                         <a href="{{ submission.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a>
                         {% if can_delete %}
-                        <form method="POST" action="{{ url_for('delete_file_submission', submission_id=submission.id) }}"
+                        <form method="POST" action="{{ url_for('files.delete_file_submission', submission_id=submission.id) }}"
                               onsubmit="return confirm('Delete &quot;{{ submission.name }}&quot;? This cannot be undone.');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger-outline">Delete</button>

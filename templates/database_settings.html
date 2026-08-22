@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-<a href="{{ url_for('settings') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Settings</a>
+<a href="{{ url_for('settings.settings') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Settings</a>
 
 <div class="page-header">
     <div>
@@ -35,7 +35,7 @@
                 <td>{{ item.name }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>
-                    <form method="POST" action="{{ url_for('update_threshold', item_id=item.id) }}" style="display:flex; gap:8px; align-items:center;">
+                    <form method="POST" action="{{ url_for('settings.update_threshold', item_id=item.id) }}" style="display:flex; gap:8px; align-items:center;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="number" name="threshold" min="0"
                                value="{{ item.low_stock_threshold if item.low_stock_threshold is not none else '' }}"
@@ -58,7 +58,7 @@
         <p class="page-subtitle">Items that have been deleted from Inventory but are still stored in the database. Removing them here is permanent and cannot be undone - their history stays in Reports, but the item itself will no longer exist.</p>
     </div>
     {% if inactive_items %}
-    <form method="POST" action="{{ url_for('purge_all_inactive_items') }}" style="align-self:center;"
+    <form method="POST" action="{{ url_for('settings.purge_all_inactive_items') }}" style="align-self:center;"
           onsubmit="return confirm('Permanently delete all {{ inactive_items|length }} inactive item{{ 's' if inactive_items|length != 1 else '' }}? Their history will remain in Reports, but this cannot be undone.');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger-outline">Delete All Inactive</button>
@@ -86,7 +86,7 @@
                 <td>{{ item.quantity }}</td>
                 <td>${{ item.price }}</td>
                 <td>
-                    <form method="POST" action="{{ url_for('purge_inactive_item', item_id=item.id) }}"
+                    <form method="POST" action="{{ url_for('settings.purge_inactive_item', item_id=item.id) }}"
                           onsubmit="return confirm('Permanently delete &quot;{{ item.name }}&quot;? Its history will remain in Reports, but this cannot be undone.');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger-outline">Delete Permanently</button>
