@@ -53,10 +53,11 @@ def inject_current_user():
     return {"header_user": get_user()}
 
 
-def require_database_settings_access(view_func):
-    """Blocks members of the "basic permissions" Entra ID group from
-    Database Settings and its sub-routes (threshold updates, purging
-    inactive items). Fails CLOSED: if membership can't be reliably
+def require_elevated_access(view_func):
+    """Blocks members of the "basic permissions" Entra ID group from an
+    entire section - both the page itself and its sub-routes. Currently
+    used by Database Settings (and its threshold/purge sub-routes) and
+    Hardware & Warranty. Fails CLOSED: if membership can't be reliably
     determined - missing config, Graph error, no user ID - access is
     denied rather than silently allowed. That's a deliberate choice: the
     failure mode of "the restricted group gets in anyway" is worse than
@@ -66,7 +67,7 @@ def require_database_settings_access(view_func):
         try:
             is_basic_permissions = is_basic_permissions_user(get_user_id())
         except GroupCheckError as e:
-            print(f"Database Settings access check failed, denying access: {e}")
+            print(f"Elevated-access check failed for {view_func.__name__}, denying access: {e}")
             return render_template("access_denied.html", reason="check_failed", title="Access Denied"), 403
 
         if is_basic_permissions:
@@ -100,6 +101,23 @@ def can_delete_files():
         return not is_basic_permissions_user(get_user_id())
     except GroupCheckError as e:
         print(f"File-deletion permission check failed, denying: {e}")
+        return False
+
+
+def can_view_hardware_warranty():
+    """True if the signed-in user is allowed to see the Hardware &
+    Warranty dashboard card at all - i.e. NOT a member of the
+    basic-permissions group. Unlike can_place_orders/can_delete_files
+    (which gate one action within an otherwise-visible section), this
+    controls whether the card renders at all - matching Database
+    Settings' pattern where restricted users can't view the section,
+    not just act within it. The actual page itself is separately
+    enforced by @require_elevated_access, so this check existing only
+    controls the dashboard card's visibility, not real access."""
+    try:
+        return not is_basic_permissions_user(get_user_id())
+    except GroupCheckError as e:
+        print(f"Hardware & Warranty visibility check failed, denying: {e}")
         return False
 
 
@@ -142,7 +160,13 @@ def dashboard():
         "added_this_week": added_this_week,
     }
 
-    return render_template("dashboard.html", title="Dashboard", stats=stats, recent_logs=recent_logs)
+    return render_template(
+        "dashboard.html",
+        title="Dashboard",
+        stats=stats,
+        recent_logs=recent_logs,
+        can_view_hardware_warranty=can_view_hardware_warranty(),
+    )
 
 
 @app.route("/inventory/low-stock")
@@ -999,8 +1023,14 @@ def settings():
     )
 
 
+@app.route("/hardware-warranty")
+@require_elevated_access
+def hardware_warranty():
+    return render_template("hardware_warranty.html", title="Hardware & Warranty")
+
+
 @app.route("/settings/database")
-@require_database_settings_access
+@require_elevated_access
 def database_settings():
     db = SessionLocal()
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
@@ -1020,7 +1050,7 @@ def database_settings():
 
 
 @app.route("/settings/database/update/<int:item_id>", methods=["POST"])
-@require_database_settings_access
+@require_elevated_access
 def update_threshold(item_id):
     db = SessionLocal()
     try:
@@ -1042,7 +1072,7 @@ def update_threshold(item_id):
 
 
 @app.route("/settings/database/purge/<int:item_id>", methods=["POST"])
-@require_database_settings_access
+@require_elevated_access
 def purge_inactive_item(item_id):
     """Permanently deletes a single inactive (already soft-deleted) item.
     Its audit trail is kept, not deleted, and this action itself is logged
@@ -1079,7 +1109,7 @@ def purge_inactive_item(item_id):
 
 
 @app.route("/settings/database/purge-all-inactive", methods=["POST"])
-@require_database_settings_access
+@require_elevated_access
 def purge_all_inactive_items():
     """Permanently deletes every inactive item in one transaction - all or
     nothing. Audit trails are kept, and each removal is itself logged as a

@@ -50,6 +50,14 @@ MAX_RETRIES = 3           # number of attempts for transient (429/503) failures
 # done once (lazily) and reused, so we don't hit the vault on every call.
 _CERT_CACHE = None  # will hold {"private_key": <PEM str>, "thumbprint": <hex str>}
 
+# Module-level cache for the MSAL client itself. Reusing the same instance
+# (rather than constructing a new ConfidentialClientApplication on every
+# call) is what lets MSAL's own internal token cache actually work -
+# acquire_token_for_client() returns an unexpired cached token instantly,
+# no network round-trip, as long as it's called on the SAME instance that
+# originally fetched it. A fresh instance has an empty cache every time.
+_MSAL_APP_CACHE = None
+
 
 def request_with_retry(method, url, **kwargs):
     """Wrapper around requests that always applies a timeout and retries on
@@ -117,18 +125,32 @@ def _load_certificate_from_key_vault():
     return _CERT_CACHE
 
 
-def get_graph_token():
-    """Acquires an app-only Microsoft Graph access token using the
-    CERTIFICATE credential (client credentials flow)."""
-    authority = f"https://login.microsoftonline.com/{TENANT_ID}"
+def _get_msal_app():
+    """Returns the cached MSAL ConfidentialClientApplication, creating it
+    once on first use. See _MSAL_APP_CACHE above for why this matters -
+    without it, every call would build a fresh client with an empty
+    token cache and re-authenticate to Entra needlessly."""
+    global _MSAL_APP_CACHE
+    if _MSAL_APP_CACHE is not None:
+        return _MSAL_APP_CACHE
 
+    authority = f"https://login.microsoftonline.com/{TENANT_ID}"
     client_credential = _load_certificate_from_key_vault()
 
-    app = msal.ConfidentialClientApplication(
+    _MSAL_APP_CACHE = msal.ConfidentialClientApplication(
         CLIENT_ID,
         authority=authority,
         client_credential=client_credential,
     )
+    return _MSAL_APP_CACHE
+
+
+def get_graph_token():
+    """Acquires an app-only Microsoft Graph access token using the
+    CERTIFICATE credential (client credentials flow). Reuses a cached
+    MSAL client (see _get_msal_app) so a still-valid token is returned
+    from MSAL's own cache instead of re-authenticating on every call."""
+    app = _get_msal_app()
 
     result = app.acquire_token_for_client(scopes=GRAPH_SCOPE)
 
