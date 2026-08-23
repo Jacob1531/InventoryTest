@@ -233,7 +233,7 @@ function wireFetchForm(formId, btnId, bannerId, busyLabel, idleLabel, validateFn
             .then(res => res.text().then(text => ({ ok: res.ok, text })))
             .then(({ ok, text }) => {
                 if (!ok) {
-                    banner.textContent = text || "Something went wrong. Please try again.";
+                    banner.textContent = cleanErrorText(text, "Something went wrong. Please try again.");
                     banner.style.display = "block";
                     btn.disabled = false;
                     btn.textContent = idleLabel;

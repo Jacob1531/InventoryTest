@@ -366,7 +366,7 @@ document.getElementById("addForm").addEventListener("submit", function(event) {
         .then(res => res.text().then(text => ({ ok: res.ok, text })))
         .then(({ ok, text }) => {
             if (!ok) {
-                errorBanner.textContent = text || "Add failed. Please check the values and try again.";
+                errorBanner.textContent = cleanErrorText(text, "Add failed. Please check the values and try again.");
                 errorBanner.style.display = "block";
                 saveBtn.disabled = false;
                 saveBtn.textContent = "Add Item";
@@ -494,7 +494,7 @@ document.getElementById("editForm").addEventListener("submit", function(event) {
             if (!ok) {
                 // Show the server's rejection reason inline instead of ever
                 // letting the browser navigate to it as a raw response page.
-                errorBanner.textContent = text || "Save failed. Please check the values and try again.";
+                errorBanner.textContent = cleanErrorText(text, "Save failed. Please check the values and try again.");
                 errorBanner.style.display = "block";
                 saveBtn.disabled = false;
                 saveBtn.textContent = "Save Changes";

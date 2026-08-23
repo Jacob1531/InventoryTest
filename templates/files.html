@@ -261,7 +261,7 @@ document.getElementById("fileUploadForm").addEventListener("submit", function(ev
         .then(res => res.text().then(text => ({ ok: res.ok, text })))
         .then(({ ok, text }) => {
             if (!ok) {
-                errorBanner.textContent = text || "Upload failed. Please try again.";
+                errorBanner.textContent = cleanErrorText(text, "Upload failed. Please try again.");
                 errorBanner.style.display = "block";
                 saveBtn.disabled = false;
                 saveBtn.textContent = "Upload";

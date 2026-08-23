@@ -313,7 +313,7 @@ document.getElementById("addHardwareForm").addEventListener("submit", function(e
         .then(res => res.text().then(text => ({ ok: res.ok, text })))
         .then(({ ok, text }) => {
             if (!ok) {
-                banner.textContent = text || "Failed to add hardware.";
+                banner.textContent = cleanErrorText(text, "Failed to add hardware.");
                 banner.style.display = "block";
                 btn.disabled = false;
                 btn.textContent = "Add Hardware";

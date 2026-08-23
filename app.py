@@ -24,7 +24,7 @@ The URLs themselves are unchanged.
 import os
 
 from flask import Flask
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 
 from auth import get_user
 
@@ -44,6 +44,22 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 csrf = CSRFProtect(app)
 
+# By default Flask-WTF expires CSRF tokens after 1 hour, independently of
+# the session. That means leaving a tab open over lunch and then
+# submitting a form fails - even though the user is still signed in -
+# and they lose whatever they had typed. Setting this to None ties the
+# token's validity to the session instead, which is Flask-WTF's
+# documented option for exactly this case: the token is still
+# session-bound and still validated on every POST, it just doesn't time
+# out on its own separate clock.
+#
+# The trade-off: the standalone time limit is a defense-in-depth layer
+# against a token that has somehow been captured being replayed much
+# later. Session binding remains the primary protection. If you'd rather
+# keep a hard cap, replace None with a number of seconds (e.g. 28800 for
+# an 8-hour workday).
+app.config["WTF_CSRF_TIME_LIMIT"] = 28800
+
 # Applies to every request, not just Files - there was previously no cap
 # anywhere in the app. 25MB comfortably covers normal documents/scans for
 # Files and is far more than inventory images or Excel imports need, so
@@ -58,6 +74,20 @@ app.register_blueprint(reports_bp)
 app.register_blueprint(files_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(hardware_bp)
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    # Flask-WTF's default is a full HTML error page. Every form in this app
+    # submits via fetch() and shows the response body inline, so an HTML
+    # page would get dumped into a small error banner as raw markup.
+    # Returning plain text keeps that banner readable, and reads sensibly
+    # on its own for the few plain (non-fetch) form posts too.
+    return (
+        "Your session expired while this page was open. "
+        "Please refresh the page and try again.",
+        400,
+    )
 
 
 @app.errorhandler(413)
