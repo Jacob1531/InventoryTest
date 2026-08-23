@@ -38,7 +38,13 @@ def is_allowed_submission_filename(filename):
     return not filename.lower().endswith(BLOCKED_EXTENSIONS)
 
 
-def upload_submission_file(file):
+def upload_submission_file(file, prefix="files"):
+    """Uploads to the submissions container under the given path prefix.
+    Hardware documents pass prefix="hardware" so they're namespaced
+    separately from general file submissions - same container (no extra
+    Azure setup needed), distinct folder. generate_file_url and
+    delete_submission_file work on any prefix since they take the full
+    returned blob_path."""
     connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 
     if not connect_str:
@@ -48,7 +54,7 @@ def upload_submission_file(file):
     container_client = blob_service.get_container_client(CONTAINER)
 
     filename = f"{uuid.uuid4()}_{file.filename}"
-    blob_path = f"files/{filename}"
+    blob_path = f"{prefix}/{filename}"
 
     blob_client = container_client.get_blob_client(blob_path)
     blob_client.upload_blob(file, overwrite=True)

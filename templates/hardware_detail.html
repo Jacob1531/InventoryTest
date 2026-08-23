@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('hardware.hardware_warranty') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Hardware &amp; Warranty</a>
+
+<div class="page-header">
+    <div>
+        <h2>{{ item.name }}</h2>
+        <p class="page-subtitle">
+            {{ item.hardware_type }}{% if item.manufacturer %} · {{ item.manufacturer }}{% endif %}{% if item.model %} {{ item.model }}{% endif %}
+        </p>
+    </div>
+    <div style="align-self:center; display:flex; gap:8px; align-items:center;">
+        <span class="badge badge-warranty-{{ item.warranty_state|lower }}">{{ item.warranty_label }}</span>
+        <form method="POST" action="{{ url_for('hardware.delete_hardware', item_id=item.id) }}"
+              onsubmit="return confirm('Delete &quot;{{ item.name }}&quot;? Its documents and notes are kept but the item is removed from the list.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger-outline">Delete Item</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom:28px;">
+    <h2>Details</h2>
+    <p class="panel-subtitle">
+        {% if item.warranty_expires %}
+            {% if item.days_left is not none and item.days_left < 0 %}
+                Warranty expired {{ -item.days_left }} day{{ 's' if -item.days_left != 1 else '' }} ago ({{ item.warranty_expires.strftime('%Y-%m-%d') }}).
+            {% else %}
+                Warranty expires in {{ item.days_left }} day{{ 's' if item.days_left != 1 else '' }} ({{ item.warranty_expires.strftime('%Y-%m-%d') }}).
+            {% endif %}
+        {% else %}
+            No warranty expiry recorded.
+        {% endif %}
+    </p>
+
+    <form id="editHardwareForm" method="POST" action="{{ url_for('hardware.edit_hardware', item_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p id="editHardwareError" class="form-error-banner" style="display:none;"></p>
+        <div class="form-grid">
+            <div class="field">
+                <label for="edName">Name</label>
+                <input type="text" id="edName" name="name" value="{{ item.name }}" required>
+                <span class="field-error" id="edNameError"></span>
+            </div>
+            <div class="field">
+                <label for="edType">Type</label>
+                <select id="edType" name="hardware_type" required>
+                    {% for t in hardware_types %}
+                    <option value="{{ t }}" {{ 'selected' if item.hardware_type == t else '' }}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="edManufacturer">Manufacturer</label>
+                <input type="text" id="edManufacturer" name="manufacturer" value="{{ item.manufacturer or '' }}">
+            </div>
+            <div class="field">
+                <label for="edModel">Model</label>
+                <input type="text" id="edModel" name="model" value="{{ item.model or '' }}">
+            </div>
+            <div class="field">
+                <label for="edSerial">Serial Number</label>
+                <input type="text" id="edSerial" name="serial_number" value="{{ item.serial_number or '' }}">
+            </div>
+            <div class="field">
+                <label for="edLocation">Location</label>
+                <input type="text" id="edLocation" name="location" value="{{ item.location or '' }}">
+            </div>
+            <div class="field">
+                <label for="edAssigned">Assigned To</label>
+                <input type="text" id="edAssigned" name="assigned_to" value="{{ item.assigned_to or '' }}">
+            </div>
+            <div class="field">
+                <label for="edPurchaseDate">Purchase Date</label>
+                <input type="date" id="edPurchaseDate" name="purchase_date" value="{{ item.purchase_date.strftime('%Y-%m-%d') if item.purchase_date else '' }}">
+            </div>
+            <div class="field">
+                <label for="edPrice">Purchase Price</label>
+                <input type="number" step="0.01" min="0" id="edPrice" name="purchase_price" value="{{ item.purchase_price if item.purchase_price is not none else '' }}">
+                <span class="field-error" id="edPriceError"></span>
+            </div>
+            <div class="field">
+                <label for="edWarrantyProvider">Warranty Provider</label>
+                <input type="text" id="edWarrantyProvider" name="warranty_provider" value="{{ item.warranty_provider or '' }}">
+            </div>
+            <div class="field">
+                <label for="edWarrantyExpires">Warranty Expires</label>
+                <input type="date" id="edWarrantyExpires" name="warranty_expires" value="{{ item.warranty_expires.strftime('%Y-%m-%d') if item.warranty_expires else '' }}">
+            </div>
+            <div class="field">
+                <label for="edStatus">Status</label>
+                <select id="edStatus" name="status">
+                    {% for s in hardware_statuses %}
+                    <option value="{{ s }}" {{ 'selected' if item.status == s else '' }}>{{ s|replace('_',' ')|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="editHardwareBtn">Save Changes</button>
+        </div>
+    </form>
+</div>
+
+<div class="panel" style="margin-bottom:28px;">
+    <h2>Documents</h2>
+    <p class="panel-subtitle">Receipts, manuals, and warranty paperwork for this item. Max 25 MB per file.</p>
+
+    <form id="docForm" method="POST" action="{{ url_for('hardware.add_hardware_document', item_id=item.id) }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p id="docError" class="form-error-banner" style="display:none;"></p>
+        <div class="form-grid">
+            <div class="field">
+                <label for="docName">Document Name</label>
+                <input type="text" id="docName" name="name" placeholder="e.g. Purchase receipt" required>
+                <span class="field-error" id="docNameError"></span>
+            </div>
+            <div class="field">
+                <label for="docType">Type</label>
+                <select id="docType" name="doc_type">
+                    {% for d in doc_types %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="docFile">File</label>
+                <input type="file" id="docFile" name="file" required>
+                <span class="field-error" id="docFileError"></span>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="docBtn">Attach Document</button>
+        </div>
+    </form>
+
+    {% if documents %}
+    <div class="table-wrap" style="margin-top:18px;">
+        <table class="reports-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>File</th>
+                    <th>Uploaded By</th>
+                    <th>Uploaded At</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documents %}
+                <tr>
+                    <td>{{ doc.name }}</td>
+                    <td>{{ doc.doc_type or "-" }}</td>
+                    <td>{{ doc.original_filename }}</td>
+                    <td>{{ doc.uploaded_by }}</td>
+                    <td>{{ doc.uploaded_at_display }}</td>
+                    <td>
+                        <div style="display:flex; gap:6px;">
+                            <a href="{{ doc.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a>
+                            <form method="POST" action="{{ url_for('hardware.delete_hardware_document', doc_id=doc.id) }}"
+                                  onsubmit="return confirm('Remove &quot;{{ doc.name }}&quot;? This cannot be undone.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger-outline">Remove</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="margin-top:18px;">No documents attached yet.</div>
+    {% endif %}
+</div>
+
+<div class="panel">
+    <h2>Notes</h2>
+    <p class="panel-subtitle">A running history for this item — repairs, moves, anything worth recording.</p>
+
+    <form id="noteForm" method="POST" action="{{ url_for('hardware.add_hardware_note', item_id=item.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p id="noteError" class="form-error-banner" style="display:none;"></p>
+        <div class="field">
+            <label for="noteText">Add a note</label>
+            <input type="text" id="noteText" name="note" placeholder="e.g. Replaced power supply">
+            <span class="field-error" id="noteTextError"></span>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="noteBtn">Add Note</button>
+        </div>
+    </form>
+
+    {% if notes %}
+    <div class="note-list">
+        {% for note in notes %}
+        <div class="note-item">
+            <div class="note-body">
+                <div class="note-text">{{ note.note }}</div>
+                <div class="note-meta">{{ note.created_by }} · {{ note.created_at_display }}</div>
+            </div>
+            <form method="POST" action="{{ url_for('hardware.delete_hardware_note', note_id=note.id) }}"
+                  onsubmit="return confirm('Delete this note?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="icon-btn delete-btn" title="Delete note">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="margin-top:18px;">No notes yet.</div>
+    {% endif %}
+</div>
+
+<script>
+const MAX_DOC_BYTES = 25 * 1024 * 1024; // must match app.py's MAX_CONTENT_LENGTH
+
+function wireFetchForm(formId, btnId, bannerId, busyLabel, idleLabel, validateFn) {
+    document.getElementById(formId).addEventListener("submit", function(event) {
+        event.preventDefault();
+        if (validateFn && !validateFn()) return;
+
+        const form = event.target;
+        const btn = document.getElementById(btnId);
+        const banner = document.getElementById(bannerId);
+        banner.style.display = "none";
+        btn.disabled = true;
+        btn.textContent = busyLabel;
+
+        fetch(form.action, { method: "POST", body: new FormData(form) })
+            .then(res => res.text().then(text => ({ ok: res.ok, text })))
+            .then(({ ok, text }) => {
+                if (!ok) {
+                    banner.textContent = text || "Something went wrong. Please try again.";
+                    banner.style.display = "block";
+                    btn.disabled = false;
+                    btn.textContent = idleLabel;
+                    return;
+                }
+                window.location.reload();
+            })
+            .catch(() => {
+                banner.textContent = "Couldn't reach the server. Please try again.";
+                banner.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = idleLabel;
+            });
+    });
+}
+
+function setFieldError(input, errEl, message) {
+    input.classList.toggle("has-error", !!message);
+    errEl.textContent = message || "";
+    return !message;
+}
+
+function validateEditHardware() {
+    const name = document.getElementById("edName");
+    const nameErr = document.getElementById("edNameError");
+    const price = document.getElementById("edPrice");
+    const priceErr = document.getElementById("edPriceError");
+
+    let ok = setFieldError(name, nameErr, name.value.trim() ? "" : "Name is required.");
+    const p = price.value.trim();
+    let priceMsg = "";
+    if (p !== "" && (Number.isNaN(Number(p)) || Number(p) < 0)) {
+        priceMsg = "Purchase price must be a positive number.";
+    }
+    ok = setFieldError(price, priceErr, priceMsg) && ok;
+    return ok;
+}
+
+function validateDocForm() {
+    const name = document.getElementById("docName");
+    const nameErr = document.getElementById("docNameError");
+    const file = document.getElementById("docFile");
+    const fileErr = document.getElementById("docFileError");
+
+    let ok = setFieldError(name, nameErr, name.value.trim() ? "" : "Document name is required.");
+    let fileMsg = "";
+    if (!file.files.length) {
+        fileMsg = "Choose a file first.";
+    } else if (file.files[0].size > MAX_DOC_BYTES) {
+        fileMsg = "That file is too large. Maximum upload size is 25 MB.";
+    }
+    ok = setFieldError(file, fileErr, fileMsg) && ok;
+    return ok;
+}
+
+function validateNoteForm() {
+    const note = document.getElementById("noteText");
+    const noteErr = document.getElementById("noteTextError");
+    return setFieldError(note, noteErr, note.value.trim() ? "" : "Note can't be empty.");
+}
+
+document.getElementById("edName").addEventListener("input", validateEditHardware);
+document.getElementById("edPrice").addEventListener("input", validateEditHardware);
+document.getElementById("docName").addEventListener("input", validateDocForm);
+document.getElementById("docFile").addEventListener("change", validateDocForm);
+document.getElementById("noteText").addEventListener("input", validateNoteForm);
+
+wireFetchForm("editHardwareForm", "editHardwareBtn", "editHardwareError", "Saving...", "Save Changes", validateEditHardware);
+wireFetchForm("docForm", "docBtn", "docError", "Uploading...", "Attach Document", validateDocForm);
+wireFetchForm("noteForm", "noteBtn", "noteError", "Adding...", "Add Note", validateNoteForm);
+</script>
+
+{% endblock %}

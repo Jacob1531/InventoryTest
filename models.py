@@ -84,3 +84,56 @@ class FileSubmission(Base):
     category = Column(String, nullable=True)
     uploaded_by = Column(String)
     uploaded_at = Column(DateTime, server_default=func.now(), index=True)
+
+class HardwareItem(Base):
+    """A single, individually-identified piece of equipment - one row per
+    physical device. Deliberately separate from Inventory: Inventory
+    tracks fungible quantities (42 interchangeable cans), whereas each
+    hardware item is a distinct unit with its own serial number and
+    warranty."""
+    __tablename__ = "hardware_item"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String)                        # e.g. "Front desk workstation"
+    hardware_type = Column(String, index=True)   # Computer, Printer, Monitor, Other
+    manufacturer = Column(String, nullable=True)
+    model = Column(String, nullable=True)
+    serial_number = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    assigned_to = Column(String, nullable=True)
+    purchase_date = Column(Date, nullable=True)
+    purchase_price = Column(Numeric, nullable=True)
+    warranty_provider = Column(String, nullable=True)
+    warranty_expires = Column(Date, nullable=True, index=True)
+    status = Column(String, default="ACTIVE", index=True)  # ACTIVE, IN_REPAIR, RETIRED
+    is_active = Column(Boolean, default=True, index=True)   # soft delete
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+
+
+class HardwareDocument(Base):
+    """Receipts, manuals, and warranty paperwork attached to a hardware
+    item. Many per item."""
+    __tablename__ = "hardware_document"
+
+    id = Column(Integer, primary_key=True)
+    hardware_id = Column(Integer, index=True)   # references HardwareItem.id
+    name = Column(String)                       # descriptive name the uploader typed
+    doc_type = Column(String, nullable=True)    # Receipt, Manual, Warranty, Other
+    original_filename = Column(String)
+    blob_path = Column(String)
+    uploaded_by = Column(String)
+    uploaded_at = Column(DateTime, server_default=func.now())
+
+
+class HardwareNote(Base):
+    """Timestamped notes appended to a hardware item over time - a running
+    history ("replaced power supply 3/2026") rather than one overwritable
+    free-text field."""
+    __tablename__ = "hardware_note"
+
+    id = Column(Integer, primary_key=True)
+    hardware_id = Column(Integer, index=True)   # references HardwareItem.id
+    note = Column(String)
+    created_by = Column(String)
+    created_at = Column(DateTime, server_default=func.now())

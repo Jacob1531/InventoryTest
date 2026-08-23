@@ -11,7 +11,8 @@ their location moved. Endpoint names are now namespaced as
 from flask import Blueprint, current_app, render_template
 from sqlalchemy import text
 from db import SessionLocal, engine
-from models import FileSubmission, Inventory, InventoryAudit
+from models import (FileSubmission, HardwareDocument, HardwareItem, HardwareNote,
+                    Inventory, InventoryAudit)
 from services.audit_helpers import format_eastern, resolve_item_name, week_ago_cutoff
 from permissions import can_view_hardware_warranty
 
@@ -106,3 +107,14 @@ def add_file_category_column_once():
         conn.execute(text("ALTER TABLE file_submission ADD COLUMN IF NOT EXISTS category VARCHAR"))
         conn.commit()
     return "category column added (or already existed) - remove this route now."
+
+
+# ONE-TIME MIGRATION - visit this URL once to create the three tables
+# behind the Hardware & Warranty section, then DELETE THIS ROUTE. Safe to
+# run more than once - checkfirst=True skips any table that already
+# exists rather than erroring.
+@bp.route("/create-hardware-tables-once")
+def create_hardware_tables_once():
+    for model in (HardwareItem, HardwareDocument, HardwareNote):
+        model.__table__.create(bind=engine, checkfirst=True)
+    return "hardware tables created (or already existed) - remove this route now."

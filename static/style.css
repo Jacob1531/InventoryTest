@@ -1308,3 +1308,85 @@ input[type="number"].has-error {
 .switch input:checked + .switch-slider::before {
     transform: translateX(18px);
 }
+
+/* ==========================================================================
+   Hardware & Warranty
+   ========================================================================== */
+.badge-hw-active {
+    background-color: var(--success-bg);
+    color: var(--success);
+}
+
+.badge-hw-in_repair {
+    background-color: #fffbeb;
+    color: #b45309;
+}
+
+.badge-hw-retired {
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
+}
+
+.badge-warranty-active {
+    background-color: var(--success-bg);
+    color: var(--success);
+}
+
+.badge-warranty-expiring {
+    background-color: #fffbeb;
+    color: #b45309;
+}
+
+.badge-warranty-expired {
+    background-color: var(--danger-bg);
+    color: var(--danger);
+}
+
+.badge-warranty-none {
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
+}
+
+.warranty-date {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 12px;
+    color: var(--text-faint);
+}
+
+.note-list {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.note-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.note-item:last-child {
+    border-bottom: none;
+}
+
+.note-body {
+    flex: 1;
+}
+
+.note-text {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.note-meta {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 4px;
+}

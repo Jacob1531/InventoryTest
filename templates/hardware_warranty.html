@@ -6,10 +6,328 @@
 <div class="page-header">
     <div>
         <h2>Hardware &amp; Warranty</h2>
-        <p class="page-subtitle">Track hardware assets and their warranty status.</p>
+        <p class="page-subtitle">Every piece of equipment on site, with warranty status, documents, and notes.</p>
     </div>
 </div>
 
-<div class="empty-state">This section is still being set up - check back soon.</div>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ items|length }}</div>
+        <div class="stat-label">Total Items</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.ACTIVE }}</div>
+        <div class="stat-label">Under Warranty</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value {{ 'stat-alert' if summary.EXPIRING > 0 else '' }}">{{ summary.EXPIRING }}</div>
+        <div class="stat-label">Expiring Soon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value {{ 'stat-alert' if summary.EXPIRED > 0 else '' }}">{{ summary.EXPIRED }}</div>
+        <div class="stat-label">Warranty Expired</div>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom:28px;">
+    <h2>Add Hardware</h2>
+    <p class="panel-subtitle">Only name and type are required — everything else can be filled in later.</p>
+
+    <form id="addHardwareForm" method="POST" action="{{ url_for('hardware.add_hardware') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p id="addHardwareError" class="form-error-banner" style="display:none;"></p>
+        <div class="form-grid">
+            <div class="field">
+                <label for="hwName">Name</label>
+                <input type="text" id="hwName" name="name" placeholder="e.g. Front desk workstation" required>
+                <span class="field-error" id="hwNameError"></span>
+            </div>
+            <div class="field">
+                <label for="hwType">Type</label>
+                <select id="hwType" name="hardware_type" required>
+                    {% for t in hardware_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="hwManufacturer">Manufacturer</label>
+                <input type="text" id="hwManufacturer" name="manufacturer" placeholder="e.g. Dell">
+            </div>
+            <div class="field">
+                <label for="hwModel">Model</label>
+                <input type="text" id="hwModel" name="model" placeholder="e.g. OptiPlex 7090">
+            </div>
+            <div class="field">
+                <label for="hwSerial">Serial Number</label>
+                <input type="text" id="hwSerial" name="serial_number">
+            </div>
+            <div class="field">
+                <label for="hwLocation">Location</label>
+                <input type="text" id="hwLocation" name="location" placeholder="e.g. Front office">
+            </div>
+            <div class="field">
+                <label for="hwAssigned">Assigned To</label>
+                <input type="text" id="hwAssigned" name="assigned_to">
+            </div>
+            <div class="field">
+                <label for="hwPurchaseDate">Purchase Date</label>
+                <input type="date" id="hwPurchaseDate" name="purchase_date">
+            </div>
+            <div class="field">
+                <label for="hwPrice">Purchase Price</label>
+                <input type="number" step="0.01" min="0" id="hwPrice" name="purchase_price" placeholder="0.00">
+                <span class="field-error" id="hwPriceError"></span>
+            </div>
+            <div class="field">
+                <label for="hwWarrantyProvider">Warranty Provider</label>
+                <input type="text" id="hwWarrantyProvider" name="warranty_provider">
+            </div>
+            <div class="field">
+                <label for="hwWarrantyExpires">Warranty Expires</label>
+                <input type="date" id="hwWarrantyExpires" name="warranty_expires">
+            </div>
+            <div class="field">
+                <label for="hwStatus">Status</label>
+                <select id="hwStatus" name="status">
+                    {% for s in hardware_statuses %}<option value="{{ s }}">{{ s|replace('_',' ')|title }}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="addHardwareBtn">Add Hardware</button>
+        </div>
+    </form>
+</div>
+
+{% if items %}
+<div class="filters">
+    <input type="text" id="hardwareSearch" placeholder="Search by name, serial, location..." onkeyup="filterHardware()" class="search-box">
+    <select id="hardwareTypeFilter" onchange="filterHardware()" class="action-filter">
+        <option value="">All Types</option>
+        {% for t in types_in_use %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+    <select id="hardwareWarrantyFilter" onchange="filterHardware()" class="action-filter">
+        <option value="">All Warranty States</option>
+        <option value="ACTIVE">Under warranty</option>
+        <option value="EXPIRING">Expiring soon</option>
+        <option value="EXPIRED">Expired</option>
+        <option value="NONE">No warranty</option>
+    </select>
+    <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('hardwareTable', 'hardware.xlsx')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export to Excel
+    </button>
+</div>
+
+<div class="table-wrap">
+    <table id="hardwareTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Serial</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Warranty</th>
+                <th class="no-export"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr data-type="{{ item.hardware_type }}" data-warranty="{{ item.warranty_state }}">
+                <td>{{ item.name }}</td>
+                <td>{{ item.hardware_type }}</td>
+                <td>{{ item.serial_number or "-" }}</td>
+                <td>{{ item.location or "-" }}</td>
+                <td><span class="badge badge-hw-{{ item.status|lower }}">{{ item.status|replace('_',' ')|title }}</span></td>
+                <td>
+                    <span class="badge badge-warranty-{{ item.warranty_state|lower }}">{{ item.warranty_label }}</span>
+                    {% if item.warranty_expires %}
+                    <span class="warranty-date">{{ item.warranty_expires.strftime('%Y-%m-%d') }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('hardware.hardware_detail', item_id=item.id) }}" class="btn btn-secondary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p id="hardwareNoResults" class="no-results" style="display:none;">No matching results.</p>
+    <div class="pagination-bar" id="hardwarePaginationBar">
+        <span id="hardwarePageSummary">Showing 0 of 0</span>
+        <div class="pagination-controls">
+            <label for="hardwarePerPageSelect" style="margin-right:2px;">Rows per page:</label>
+            <select id="hardwarePerPageSelect" class="per-page-select" onchange="changeHardwarePageSize(this.value)">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button type="button" class="page-nav-btn" id="hardwarePrevBtn" onclick="goToHardwarePage(-1)" title="Previous page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-indicator" id="hardwarePageIndicator">Page 1 of 1</span>
+            <button type="button" class="page-nav-btn" id="hardwareNextBtn" onclick="goToHardwarePage(1)" title="Next page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let hardwareCurrentPage = 1;
+let hardwarePerPage = 25;
+
+function filterHardware()
+{
+    const query = document.getElementById("hardwareSearch").value.toLowerCase();
+    const typeInput = document.getElementById("hardwareTypeFilter").value;
+    const warrantyInput = document.getElementById("hardwareWarrantyFilter").value;
+    const rows = document.querySelectorAll("#hardwareTable tbody tr");
+
+    rows.forEach(row => {
+        const matchesSearch = row.textContent.toLowerCase().includes(query);
+        const matchesType = typeInput === "" || row.dataset.type === typeInput;
+        const matchesWarranty = warrantyInput === "" || row.dataset.warranty === warrantyInput;
+        row.dataset.filterMatch = (matchesSearch && matchesType && matchesWarranty) ? "true" : "false";
+    });
+
+    hardwareCurrentPage = 1;
+    renderHardwarePage();
+}
+
+function changeHardwarePageSize(value)
+{
+    hardwarePerPage = parseInt(value, 10);
+    hardwareCurrentPage = 1;
+    renderHardwarePage();
+}
+
+function goToHardwarePage(delta)
+{
+    hardwareCurrentPage += delta;
+    renderHardwarePage();
+}
+
+function renderHardwarePage()
+{
+    const allRows = Array.from(document.querySelectorAll("#hardwareTable tbody tr"));
+    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
+    const totalFiltered = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / hardwarePerPage));
+
+    if (hardwareCurrentPage > totalPages) hardwareCurrentPage = totalPages;
+    if (hardwareCurrentPage < 1) hardwareCurrentPage = 1;
+
+    const startIdx = (hardwareCurrentPage - 1) * hardwarePerPage;
+    const endIdx = startIdx + hardwarePerPage;
+
+    allRows.forEach(row => {
+        if (row.dataset.filterMatch === "false") {
+            row.style.display = "none";
+            return;
+        }
+        const idxInFiltered = filteredRows.indexOf(row);
+        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
+        row.style.display = onCurrentPage ? "" : "none";
+    });
+
+    document.getElementById("hardwareNoResults").style.display = totalFiltered === 0 ? "block" : "none";
+    document.getElementById("hardwarePaginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
+
+    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
+    const rangeEnd = Math.min(endIdx, totalFiltered);
+    document.getElementById("hardwarePageSummary").textContent =
+        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
+    document.getElementById("hardwarePageIndicator").textContent =
+        `Page ${hardwareCurrentPage} of ${totalPages}`;
+
+    document.getElementById("hardwarePrevBtn").disabled = hardwareCurrentPage <= 1;
+    document.getElementById("hardwareNextBtn").disabled = hardwareCurrentPage >= totalPages;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("#hardwareTable tbody tr").forEach(row => {
+        row.dataset.filterMatch = "true";
+    });
+    renderHardwarePage();
+});
+</script>
+
+{% else %}
+<div class="empty-state">No hardware recorded yet. Add your first item above.</div>
+{% endif %}
+
+<script>
+function validateAddHardwareForm()
+{
+    const nameInput = document.getElementById("hwName");
+    const nameErr = document.getElementById("hwNameError");
+    const priceInput = document.getElementById("hwPrice");
+    const priceErr = document.getElementById("hwPriceError");
+    let ok = true;
+
+    if (!nameInput.value.trim()) {
+        nameInput.classList.add("has-error");
+        nameErr.textContent = "Name is required.";
+        ok = false;
+    } else {
+        nameInput.classList.remove("has-error");
+        nameErr.textContent = "";
+    }
+
+    const priceStr = priceInput.value.trim();
+    if (priceStr !== "") {
+        const priceNum = Number(priceStr);
+        if (Number.isNaN(priceNum) || priceNum < 0) {
+            priceInput.classList.add("has-error");
+            priceErr.textContent = "Purchase price must be a positive number.";
+            ok = false;
+        } else {
+            priceInput.classList.remove("has-error");
+            priceErr.textContent = "";
+        }
+    } else {
+        priceInput.classList.remove("has-error");
+        priceErr.textContent = "";
+    }
+
+    return ok;
+}
+
+document.getElementById("hwName").addEventListener("input", validateAddHardwareForm);
+document.getElementById("hwPrice").addEventListener("input", validateAddHardwareForm);
+
+document.getElementById("addHardwareForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+    if (!validateAddHardwareForm()) return;
+
+    const form = event.target;
+    const btn = document.getElementById("addHardwareBtn");
+    const banner = document.getElementById("addHardwareError");
+    banner.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Adding...";
+
+    fetch(form.action, { method: "POST", body: new FormData(form) })
+        .then(res => res.text().then(text => ({ ok: res.ok, text })))
+        .then(({ ok, text }) => {
+            if (!ok) {
+                banner.textContent = text || "Failed to add hardware.";
+                banner.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = "Add Hardware";
+                return;
+            }
+            window.location.reload();
+        })
+        .catch(() => {
+            banner.textContent = "Couldn't reach the server. Please try again.";
+            banner.style.display = "block";
+            btn.disabled = false;
+            btn.textContent = "Add Hardware";
+        });
+});
+</script>
 
 {% endblock %}
