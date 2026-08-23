@@ -69,6 +69,21 @@
 
 </div>
 
+{% if categories %}
+<h3 class="section-heading" style="margin-top:28px;">Inventory by Category</h3>
+<div class="chart-panel">
+    {% for cat in categories %}
+    <div class="chart-row">
+        <span class="chart-label" title="{{ cat.label }}">{{ cat.label }}</span>
+        <div class="chart-track">
+            <div class="chart-bar" style="width: {{ cat.percent }}%;"></div>
+        </div>
+        <span class="chart-value">{{ cat.count }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 {% if recent_logs %}
 <h3 class="section-heading" style="margin-top:28px;">Recent Activity</h3>
 <div class="activity-list">

@@ -21,6 +21,16 @@
     --accent-strong: #27272a;
     --accent-contrast: #ffffff;
 
+    /* Brand accent, sampled from the Diaspora logo (#1890c0) and darkened
+       to #127099 so white button text clears WCAG AA (5.5:1 vs 3.6:1 for
+       the raw logo blue). Used sparingly - primary actions, focus rings,
+       and hover states. Everything else stays neutral gray. */
+    --brand: #127099;
+    --brand-hover: #0d6285;
+    --brand-contrast: #ffffff;
+    --brand-soft: #eff8fc;
+    --brand-border: #bfe2f0;
+
     --danger: #b91c1c;
     --danger-bg: #fef2f2;
     --success: #15803d;
@@ -58,6 +68,13 @@
     --accent: #a1a1aa;
     --accent-strong: #e4e4e7;
     --accent-contrast: #18181b;
+
+    /* Brighter on dark surfaces (7.6:1 against the card background). */
+    --brand: #38bdf8;
+    --brand-hover: #5cc9f0;
+    --brand-contrast: #0c2a36;
+    --brand-soft: rgba(56, 189, 248, 0.10);
+    --brand-border: rgba(56, 189, 248, 0.35);
 
     --danger: #f87171;
     --danger-bg: rgba(248, 113, 113, 0.12);
@@ -125,8 +142,8 @@ button {
     right: 0;
     bottom: -1px;
     height: 2px;
-    background: linear-gradient(90deg, var(--text-faint) 0%, transparent 60%);
-    opacity: 0.35;
+    background: linear-gradient(90deg, var(--brand) 0%, transparent 65%);
+    opacity: 0.85;
 }
 
 .brand {
@@ -246,14 +263,16 @@ button {
 }
 
 .page-header h2 {
-    margin: 0 0 4px;
-    font-size: 22px;
+    margin: 0 0 6px;
+    font-size: 28px;
+    letter-spacing: -0.02em;
 }
 
 .page-subtitle {
     margin: 0;
     color: var(--text-muted);
-    font-size: 14px;
+    font-size: 14.5px;
+    line-height: 1.5;
 }
 
 .back-link {
@@ -268,7 +287,7 @@ button {
 }
 
 .back-link:hover {
-    color: var(--text);
+    color: var(--brand);
 }
 
 /* ==========================================================================
@@ -297,7 +316,13 @@ button {
 .card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-hover);
-    border-color: var(--border-strong);
+    border-color: var(--brand-border);
+}
+
+.card:hover .card-icon {
+    background: var(--brand-soft);
+    border-color: var(--brand-border);
+    color: var(--brand);
 }
 
 .card-icon {
@@ -319,7 +344,8 @@ button {
 
 .card h2 {
     margin: 0;
-    font-size: 16px;
+    font-size: 17px;
+    letter-spacing: -0.01em;
 }
 
 .card p {
@@ -380,12 +406,12 @@ button {
 }
 
 .btn-primary {
-    background: var(--accent-strong);
-    color: var(--accent-contrast);
+    background: var(--brand);
+    color: var(--brand-contrast);
 }
 
 .btn-primary:hover {
-    background: #000000;
+    background: var(--brand-hover);
 }
 
 .btn-secondary {
@@ -584,7 +610,8 @@ button {
 
 .panel h2 {
     margin: 0 0 4px;
-    font-size: 17px;
+    font-size: 19px;
+    letter-spacing: -0.01em;
 }
 
 .panel .panel-subtitle {
@@ -629,12 +656,13 @@ select {
 
 input[type="text"]:focus,
 input[type="number"]:focus,
+input[type="date"]:focus,
 input[type="file"]:focus,
 select:focus,
 .search-box:focus {
     outline: none;
-    border-color: var(--accent-strong);
-    box-shadow: 0 0 0 3px rgba(39, 39, 42, 0.08);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
 input[type="file"] {
@@ -1074,7 +1102,7 @@ input[type="number"].has-error {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 18px 20px;
+    padding: 22px 22px 20px;
     box-shadow: var(--shadow-sm);
 }
 
@@ -1089,15 +1117,15 @@ input[type="number"].has-error {
 .stat-card-link:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-hover);
-    border-color: var(--border-strong);
+    border-color: var(--brand-border);
 }
 
 .stat-value {
-    font-size: 24px;
+    font-size: 38px;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.03em;
     color: var(--text);
-    line-height: 1.2;
+    line-height: 1.1;
 }
 
 .stat-value.stat-alert {
@@ -1105,14 +1133,18 @@ input[type="number"].has-error {
 }
 
 .stat-label {
-    font-size: 12.5px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: var(--text-muted);
-    margin-top: 2px;
+    margin-top: 6px;
 }
 
 .section-heading {
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
+    letter-spacing: -0.01em;
     margin: 0 0 12px;
     color: var(--text);
 }
@@ -1389,4 +1421,72 @@ input[type="number"].has-error {
     font-size: 12px;
     color: var(--text-faint);
     margin-top: 4px;
+}
+
+/* ==========================================================================
+   Dashboard category chart
+   --------------------------------------------------------------------------
+   Plain CSS bars sized from server-computed percentages - no charting
+   library, no external script. Bar widths come from
+   services/chart_data.py and are relative to the largest category.
+   ========================================================================== */
+.chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.chart-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 40px;
+    align-items: center;
+    gap: 14px;
+}
+
+.chart-label {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chart-track {
+    background: var(--surface-muted);
+    border-radius: 6px;
+    height: 10px;
+    overflow: hidden;
+}
+
+.chart-bar {
+    height: 100%;
+    border-radius: 6px;
+    background: var(--brand);
+    /* animates in on load, so the dashboard has one moment of motion */
+    animation: chart-grow 0.5s ease-out;
+}
+
+.chart-value {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes chart-grow {
+    from { transform: scaleX(0); transform-origin: left; }
+    to   { transform: scaleX(1); transform-origin: left; }
+}
+
+@media (max-width: 560px) {
+    .chart-row {
+        grid-template-columns: 90px 1fr 34px;
+        gap: 10px;
+    }
 }

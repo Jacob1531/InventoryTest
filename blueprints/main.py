@@ -13,6 +13,7 @@ from sqlalchemy import text
 from db import SessionLocal, engine
 from models import (FileSubmission, HardwareDocument, HardwareItem, HardwareNote,
                     Inventory, InventoryAudit)
+from services.chart_data import category_breakdown
 from services.audit_helpers import format_eastern, resolve_item_name, week_ago_cutoff
 from permissions import can_view_hardware_warranty
 
@@ -50,6 +51,8 @@ def dashboard():
         log.item_name = resolve_item_name(item_names, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at)
 
+    categories = category_breakdown(active_items)
+
     db.close()
 
     stats = {
@@ -63,6 +66,7 @@ def dashboard():
         title="Dashboard",
         stats=stats,
         recent_logs=recent_logs,
+        categories=categories,
         can_view_hardware_warranty=can_view_hardware_warranty(),
     )
 
