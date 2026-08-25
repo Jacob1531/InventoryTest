@@ -2,26 +2,36 @@
    Design tokens
    ========================================================================== */
 :root {
-    --bg: #f4f4f5;
+    /* Neutrals sit on a SLATE base (a blue-tinted gray) rather than zinc
+       (pure, hueless gray). Same visual weight, but every surface, border
+       and text colour now shares a hint of the brand's hue - which is what
+       makes the palette read as harmonised rather than as gray-plus-a-blue-
+       button. Deliberately not literally blue: tinting backgrounds an
+       obvious blue looks like a colour filter, not a design. */
+    --bg: #f1f5f9;
+    --bg-tint: #e8f0f7;          /* used for the page's soft top gradient */
     --surface: #ffffff;
-    --surface-muted: #fafafa;
-    --border: #e4e4e7;
-    --border-strong: #d4d4d8;
+    --surface-muted: #f8fafc;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
 
-    --text: #18181b;
-    --text-muted: #71717a;
-    --text-faint: #a1a1aa;
+    --text: #0f172a;
+    /* Both nudged darker than the stock slate values so they clear WCAG
+       contrast against the tinted page background (the previous zinc
+       palette was marginally under: 4.40 and 2.56). */
+    --text-muted: #5d6b7f;
+    --text-faint: #7a899e;
 
-    --header-bg: #1c1c1e;
-    --header-bg-end: #0e0e10;
-    --header-text: #f4f4f5;
-    --header-text-muted: #a1a1aa;
+    --header-bg: #17202e;
+    --header-bg-end: #0b1119;
+    --header-text: #f1f5f9;
+    --header-text-muted: #94a3b8;
 
-    --accent: #52525b;
-    --accent-strong: #27272a;
+    --accent: #475569;
+    --accent-strong: #1e293b;
     --accent-contrast: #ffffff;
 
-    /* Brand accent, sampled from the Diaspora logo (#1890c0) and darkened
+    /* Brand accent, sampled from the DCS logo (#1890c0) and darkened
        to #127099 so white button text clears WCAG AA (5.5:1 vs 3.6:1 for
        the raw logo blue). Used sparingly - primary actions, focus rings,
        and hover states. Everything else stays neutral gray. */
@@ -50,24 +60,27 @@
 }
 
 [data-theme="dark"] {
-    --bg: #18181b;
-    --surface: #202023;
-    --surface-muted: #27272a;
-    --border: #3f3f46;
-    --border-strong: #52525b;
+    /* Same slate tint applied to the dark palette - kept restrained so it
+       reads as blue-tinted charcoal, not navy. */
+    --bg: #0d1219;
+    --bg-tint: #111926;
+    --surface: #161d27;
+    --surface-muted: #1d2632;
+    --border: #2b3644;
+    --border-strong: #3b4757;
 
-    --text: #f4f4f5;
-    --text-muted: #a1a1aa;
-    --text-faint: #71717a;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-faint: #64748b;
 
-    --header-bg: #101012;
-    --header-bg-end: #000000;
-    --header-text: #f4f4f5;
-    --header-text-muted: #a1a1aa;
+    --header-bg: #0c1119;
+    --header-bg-end: #05080c;
+    --header-text: #f1f5f9;
+    --header-text-muted: #94a3b8;
 
-    --accent: #a1a1aa;
-    --accent-strong: #e4e4e7;
-    --accent-contrast: #18181b;
+    --accent: #94a3b8;
+    --accent-strong: #e2e8f0;
+    --accent-contrast: #0f172a;
 
     /* Brighter on dark surfaces (7.6:1 against the card background). */
     --brand: #38bdf8;
@@ -98,7 +111,13 @@
 body {
     margin: 0;
     font-family: var(--font-sans);
+    /* Flat colour underneath, with a soft tint fading out over the first
+       screenful. Adds depth near the header without the page ever looking
+       "blue". fixed attachment keeps it anchored while scrolling. */
     background-color: var(--bg);
+    background-image: linear-gradient(180deg, var(--bg-tint) 0%, var(--bg) 420px);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     color: var(--text);
     -webkit-font-smoothing: antialiased;
 }

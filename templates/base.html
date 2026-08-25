@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% if title %}{{ title }} · Diaspora Resource Hub{% else %}Diaspora Resource Hub{% endif %}</title>
+    <title>{% if title %}{{ title }} · DCS Resource Hub{% else %}DCS Resource Hub{% endif %}</title>
     <script>
         // Applied before first paint to avoid a flash of the wrong theme.
         (function () {
@@ -33,7 +33,7 @@
         <span class="brand-divider"></span>
     </a>
     <a href="{{ url_for('main.dashboard') }}" class="brand-text">
-        <span class="brand-name">Diaspora Resource Hub</span>
+        <span class="brand-name">DCS Resource Hub</span>
         <span class="brand-tagline">Inventory &amp; Operations</span>
     </a>
     <a href="{{ url_for('settings.account_settings') }}" class="header-account">
