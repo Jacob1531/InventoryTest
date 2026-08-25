@@ -69,19 +69,36 @@
 
 </div>
 
-{% if categories %}
-<h3 class="section-heading" style="margin-top:28px;">Inventory by Category</h3>
+{% if chart.rows %}
+<div class="chart-header">
+    <h3 class="section-heading" style="margin:0;">{{ chart.title }}</h3>
+    <div class="chart-header-right">
+        <span class="chart-unit">{{ chart.value_label }}</span>
+        <a href="{{ url_for('settings.account_settings') }}#dashboard-chart" class="chart-configure" title="Change what this chart shows">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Configure
+        </a>
+    </div>
+</div>
 <div class="chart-panel">
-    {% for cat in categories %}
+    {% for row in chart.rows %}
     <div class="chart-row">
-        <span class="chart-label" title="{{ cat.label }}">{{ cat.label }}</span>
+        <span class="chart-label" title="{{ row.label }}">{{ row.label }}</span>
         <div class="chart-track">
-            <div class="chart-bar" style="width: {{ cat.percent }}%;"></div>
+            <div class="chart-bar" style="width: {{ row.percent }}%;"></div>
         </div>
-        <span class="chart-value">{{ cat.count }}</span>
+        <span class="chart-value">{{ row.count }}</span>
     </div>
     {% endfor %}
 </div>
+{% else %}
+<div class="chart-header">
+    <h3 class="section-heading" style="margin:0;">{{ chart.title }}</h3>
+    <div class="chart-header-right">
+        <a href="{{ url_for('settings.account_settings') }}#dashboard-chart" class="chart-configure">Configure</a>
+    </div>
+</div>
+<div class="empty-state">Nothing to show for these chart settings yet.</div>
 {% endif %}
 
 {% if recent_logs %}

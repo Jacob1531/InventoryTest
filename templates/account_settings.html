@@ -43,6 +43,45 @@
     </div>
 </div>
 
+<div class="panel" id="dashboard-chart" style="margin-bottom:28px;">
+    <h2>Dashboard Chart</h2>
+    <p class="panel-subtitle">Choose what the chart on your dashboard shows. This is your own setting &mdash; it doesn't affect anyone else.</p>
+
+    <form method="POST" action="{{ url_for('settings.save_dashboard_chart_preference') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-grid">
+            <div class="field">
+                <label for="chartMode">Show</label>
+                <select id="chartMode" name="chart_mode">
+                    {% for value, label in chart_modes.items() %}
+                    <option value="{{ value }}" {{ 'selected' if chart_pref.mode == value else '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="chartCategory">Category</label>
+                <select id="chartCategory" name="chart_category">
+                    <option value="">All categories</option>
+                    {% for cat in available_categories %}
+                    <option value="{{ cat }}" {{ 'selected' if chart_pref.category == cat else '' }}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="chartLimit">Items shown</label>
+                <select id="chartLimit" name="chart_limit">
+                    {% for n in chart_limits %}
+                    <option value="{{ n }}" {{ 'selected' if chart_pref.limit == n else '' }}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Chart Settings</button>
+        </div>
+    </form>
+</div>
+
 <h3 class="section-heading">My Activity</h3>
 
 {% if my_logs %}

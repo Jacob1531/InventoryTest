@@ -11,8 +11,10 @@ their location moved. Endpoint names are now namespaced as
 import os
 from flask import Blueprint, flash, redirect, render_template, request, send_from_directory, url_for
 from db import SessionLocal
-from models import Inventory, InventoryAudit
+from models import DashboardPreference, Inventory, InventoryAudit
 from services.audit_helpers import format_audit_value, format_eastern, resolve_item_name
+from services.chart_data import (DEFAULT_LIMIT, DEFAULT_MODE, MODE_LABELS, VALID_LIMITS,
+                                 normalize_limit, normalize_mode)
 from services.group_access import GroupCheckError, is_basic_permissions_user
 from auth import get_user, get_user_id
 from permissions import require_elevated_access
@@ -165,6 +167,80 @@ def account_settings():
         log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
         log.old_value_display = format_audit_value(log.field_name, log.old_value)
         log.new_value_display = format_audit_value(log.field_name, log.new_value)
+
+    pref = (
+        db.query(DashboardPreference)
+        .filter(DashboardPreference.user_key == current_user)
+        .first()
+    )
+    chart_pref = {
+        "mode": pref.chart_mode if pref else DEFAULT_MODE,
+        "category": pref.chart_category if pref else None,
+        "limit": pref.chart_limit if pref else DEFAULT_LIMIT,
+    }
+
+    # Categories that actually exist, so the filter dropdown can't offer
+    # something with no data behind it.
+    available_categories = sorted({
+        (item.category or "").strip() or "Uncategorized"
+        for item in db.query(Inventory).filter(Inventory.is_active == True).all()
+    })
+
     db.close()
 
-    return render_template("account_settings.html", current_user=current_user, my_logs=my_logs, title="Account Settings")
+    return render_template(
+        "account_settings.html",
+        current_user=current_user,
+        my_logs=my_logs,
+        chart_pref=chart_pref,
+        available_categories=available_categories,
+        chart_modes=MODE_LABELS,
+        chart_limits=VALID_LIMITS,
+        title="Account Settings",
+    )
+
+
+@bp.route("/settings/account/dashboard-chart", methods=["POST"])
+def save_dashboard_chart_preference():
+    """Saves the signed-in user's dashboard chart settings. Creates their
+    preference row on first save - rows are lazy, so users who never touch
+    this just keep the defaults."""
+    current_user = get_user()
+
+    mode = normalize_mode(request.form.get("chart_mode"))
+    limit = normalize_limit(request.form.get("chart_limit"))
+    category = (request.form.get("chart_category") or "").strip() or None
+
+    db = SessionLocal()
+    try:
+        # Only accept a category that currently exists, so a stale or
+        # hand-crafted value can't leave the chart permanently empty.
+        if category:
+            existing = {
+                (item.category or "").strip() or "Uncategorized"
+                for item in db.query(Inventory).filter(Inventory.is_active == True).all()
+            }
+            if category not in existing:
+                category = None
+
+        pref = (
+            db.query(DashboardPreference)
+            .filter(DashboardPreference.user_key == current_user)
+            .first()
+        )
+        if pref is None:
+            pref = DashboardPreference(user_key=current_user)
+            db.add(pref)
+
+        pref.chart_mode = mode
+        pref.chart_category = category
+        pref.chart_limit = limit
+        db.commit()
+
+        flash("Dashboard chart settings saved.", "success")
+        return redirect(url_for("settings.account_settings"))
+    except Exception as e:
+        db.rollback()
+        return f"Failed to save chart settings: {str(e)}", 500
+    finally:
+        db.close()

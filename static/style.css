@@ -1490,3 +1490,39 @@ input[type="number"].has-error {
         gap: 10px;
     }
 }
+
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 28px 0 12px;
+}
+
+.chart-header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.chart-unit {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.chart-configure {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+.chart-configure:hover {
+    color: var(--brand);
+}

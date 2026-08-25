@@ -44,20 +44,15 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 csrf = CSRFProtect(app)
 
-# By default Flask-WTF expires CSRF tokens after 1 hour, independently of
-# the session. That means leaving a tab open over lunch and then
-# submitting a form fails - even though the user is still signed in -
-# and they lose whatever they had typed. Setting this to None ties the
-# token's validity to the session instead, which is Flask-WTF's
-# documented option for exactly this case: the token is still
-# session-bound and still validated on every POST, it just doesn't time
-# out on its own separate clock.
+# Flask-WTF expires CSRF tokens after 1 hour by default, on a clock
+# separate from the session - so a tab left open over lunch would fail on
+# submit even though the user is still signed in, losing whatever they had
+# typed. 28800 seconds (8 hours) covers a full workday while keeping a
+# hard cap as a backstop.
 #
-# The trade-off: the standalone time limit is a defense-in-depth layer
-# against a token that has somehow been captured being replayed much
-# later. Session binding remains the primary protection. If you'd rather
-# keep a hard cap, replace None with a number of seconds (e.g. 28800 for
-# an 8-hour workday).
+# If a token does expire past this window, handle_csrf_error below returns
+# a clean "session expired, please refresh" message rather than Flask's
+# raw HTML error page.
 app.config["WTF_CSRF_TIME_LIMIT"] = 28800
 
 # Applies to every request, not just Files - there was previously no cap

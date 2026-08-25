@@ -137,3 +137,19 @@ class HardwareNote(Base):
     note = Column(String)
     created_by = Column(String)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class DashboardPreference(Base):
+    """Per-user dashboard chart settings. One row per user, keyed by the
+    Entra identity that auth.get_user() returns. Deliberately per-user
+    rather than global: the warehouse person and the office manager care
+    about different things. Rows are created lazily - a user with no row
+    simply gets the defaults, so nothing needs backfilling."""
+    __tablename__ = "dashboard_preference"
+
+    id = Column(Integer, primary_key=True)
+    user_key = Column(String, unique=True, index=True)
+    chart_mode = Column(String, default="CATEGORY")     # CATEGORY, LOW_STOCK, ON_ORDER, RECENT
+    chart_category = Column(String, nullable=True)      # None = all categories
+    chart_limit = Column(Integer, default=10)
+    updated_at = Column(DateTime, onupdate=func.now(), server_default=func.now())

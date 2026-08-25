@@ -11,10 +11,12 @@ their location moved. Endpoint names are now namespaced as
 from flask import Blueprint, current_app, render_template
 from sqlalchemy import text
 from db import SessionLocal, engine
-from models import (FileSubmission, HardwareDocument, HardwareItem, HardwareNote,
-                    Inventory, InventoryAudit)
-from services.chart_data import category_breakdown
+from models import (DashboardPreference, FileSubmission, HardwareDocument, HardwareItem,
+                    HardwareNote, Inventory, InventoryAudit, InventoryOrder)
+from services.chart_data import build_chart, DEFAULT_LIMIT, DEFAULT_MODE
 from services.audit_helpers import format_eastern, resolve_item_name, week_ago_cutoff
+from services.order_logic import compute_on_order_totals
+from auth import get_user
 from permissions import can_view_hardware_warranty
 
 bp = Blueprint("main", __name__)
@@ -51,7 +53,26 @@ def dashboard():
         log.item_name = resolve_item_name(item_names, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at)
 
-    categories = category_breakdown(active_items)
+    # Per-user chart preferences; absent row -> defaults, nothing to backfill.
+    pref = (
+        db.query(DashboardPreference)
+        .filter(DashboardPreference.user_key == get_user())
+        .first()
+    )
+    chart_mode = pref.chart_mode if pref else DEFAULT_MODE
+    chart_category = pref.chart_category if pref else None
+    chart_limit = pref.chart_limit if pref else DEFAULT_LIMIT
+
+    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
+    on_order_totals = compute_on_order_totals(pending_orders)
+
+    chart = build_chart(
+        active_items,
+        mode=chart_mode,
+        category=chart_category,
+        limit=chart_limit,
+        on_order_totals=on_order_totals,
+    )
 
     db.close()
 
@@ -66,7 +87,7 @@ def dashboard():
         title="Dashboard",
         stats=stats,
         recent_logs=recent_logs,
-        categories=categories,
+        chart=chart,
         can_view_hardware_warranty=can_view_hardware_warranty(),
     )
 
@@ -122,3 +143,12 @@ def create_hardware_tables_once():
     for model in (HardwareItem, HardwareDocument, HardwareNote):
         model.__table__.create(bind=engine, checkfirst=True)
     return "hardware tables created (or already existed) - remove this route now."
+
+
+# ONE-TIME MIGRATION - visit this URL once to create the dashboard_preference
+# table (per-user chart settings), then DELETE THIS ROUTE. Safe to run more
+# than once - checkfirst=True skips creation if it already exists.
+@bp.route("/create-dashboard-pref-table-once")
+def create_dashboard_pref_table_once():
+    DashboardPreference.__table__.create(bind=engine, checkfirst=True)
+    return "dashboard_preference table created (or already existed) - remove this route now."
