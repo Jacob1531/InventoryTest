@@ -33,7 +33,7 @@
     <h2>Add Hardware</h2>
     <p class="panel-subtitle">Only name and type are required — everything else can be filled in later.</p>
 
-    <form id="addHardwareForm" method="POST" action="{{ url_for('hardware.add_hardware') }}">
+    <form id="addHardwareForm" method="POST" action="{{ url_for('hardware.add_hardware') }}" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <p id="addHardwareError" class="form-error-banner" style="display:none;"></p>
         <div class="form-grid">
@@ -61,8 +61,15 @@
                 <input type="text" id="hwSerial" name="serial_number">
             </div>
             <div class="field">
+                <label for="hwSite">Site</label>
+                <input type="text" id="hwSite" name="site" placeholder="e.g. Main Office" list="hwSiteOptions">
+                <datalist id="hwSiteOptions">
+                    {% for s in sites_in_use %}<option value="{{ s }}">{% endfor %}
+                </datalist>
+            </div>
+            <div class="field">
                 <label for="hwLocation">Location</label>
-                <input type="text" id="hwLocation" name="location" placeholder="e.g. Front office">
+                <input type="text" id="hwLocation" name="location" placeholder="e.g. Room 204">
             </div>
             <div class="field">
                 <label for="hwAssigned">Assigned To</label>
@@ -92,6 +99,31 @@
                 </select>
             </div>
         </div>
+        <div class="form-subsection">
+            <p class="form-subsection-title">Attach a document (optional)</p>
+            <p class="form-subsection-hint">A receipt, manual, or warranty document. You can add more later from the item's page.</p>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="hwDocFile">File</label>
+                    <input type="file" id="hwDocFile" name="document">
+                    <span class="field-error" id="hwDocFileError"></span>
+                </div>
+                <div class="field">
+                    <label for="hwDocName">Document name</label>
+                    <input type="text" id="hwDocName" name="document_name" placeholder="Defaults to the filename">
+                </div>
+                <div class="field">
+                    <label for="hwDocType">Document type</label>
+                    <select id="hwDocType" name="document_type">
+                        <option value="Receipt">Receipt</option>
+                        <option value="Manual">Manual</option>
+                        <option value="Warranty">Warranty</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="form-actions">
             <button type="submit" class="btn btn-primary" id="addHardwareBtn">Add Hardware</button>
         </div>
@@ -100,10 +132,14 @@
 
 {% if items %}
 <div class="filters">
-    <input type="text" id="hardwareSearch" placeholder="Search by name, serial, location..." onkeyup="filterHardware()" class="search-box">
+    <input type="text" id="hardwareSearch" placeholder="Search by name, serial, site, location..." onkeyup="filterHardware()" class="search-box">
     <select id="hardwareTypeFilter" onchange="filterHardware()" class="action-filter">
         <option value="">All Types</option>
         {% for t in types_in_use %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+    <select id="hardwareSiteFilter" onchange="filterHardware()" class="action-filter">
+        <option value="">All Sites</option>
+        {% for s in sites_in_use %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
     </select>
     <select id="hardwareWarrantyFilter" onchange="filterHardware()" class="action-filter">
         <option value="">All Warranty States</option>
@@ -125,6 +161,7 @@
                 <th>Name</th>
                 <th>Type</th>
                 <th>Serial</th>
+                <th>Site</th>
                 <th>Location</th>
                 <th>Status</th>
                 <th>Warranty</th>
@@ -133,7 +170,7 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr data-type="{{ item.hardware_type }}" data-warranty="{{ item.warranty_state }}">
+            <tr data-type="{{ item.hardware_type }}" data-site="{{ item.site or '' }}" data-warranty="{{ item.warranty_state }}">
                 <td>{{ item.name }}</td>
                 <td>
                     <span class="type-cell">
@@ -154,6 +191,7 @@
                     </span>
                 </td>
                 <td>{{ item.serial_number or "-" }}</td>
+                <td>{{ item.site or "-" }}</td>
                 <td>{{ item.location or "-" }}</td>
                 <td><span class="badge badge-hw-{{ item.status|lower }}">{{ item.status|replace('_',' ')|title }}</span></td>
                 <td>
@@ -199,14 +237,16 @@ function filterHardware()
 {
     const query = document.getElementById("hardwareSearch").value.toLowerCase();
     const typeInput = document.getElementById("hardwareTypeFilter").value;
+    const siteInput = document.getElementById("hardwareSiteFilter").value;
     const warrantyInput = document.getElementById("hardwareWarrantyFilter").value;
     const rows = document.querySelectorAll("#hardwareTable tbody tr");
 
     rows.forEach(row => {
         const matchesSearch = row.textContent.toLowerCase().includes(query);
         const matchesType = typeInput === "" || row.dataset.type === typeInput;
+        const matchesSite = siteInput === "" || row.dataset.site === siteInput;
         const matchesWarranty = warrantyInput === "" || row.dataset.warranty === warrantyInput;
-        row.dataset.filterMatch = (matchesSearch && matchesType && matchesWarranty) ? "true" : "false";
+        row.dataset.filterMatch = (matchesSearch && matchesType && matchesSite && matchesWarranty) ? "true" : "false";
     });
 
     hardwareCurrentPage = 1;
@@ -276,8 +316,12 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endif %}
 
 <script>
+const MAX_HW_DOC_BYTES = 25 * 1024 * 1024; // must match app.py's MAX_CONTENT_LENGTH
+
 function validateAddHardwareForm()
 {
+    const docFile = document.getElementById("hwDocFile");
+    const docErr = document.getElementById("hwDocFileError");
     const nameInput = document.getElementById("hwName");
     const nameErr = document.getElementById("hwNameError");
     const priceInput = document.getElementById("hwPrice");
@@ -309,9 +353,19 @@ function validateAddHardwareForm()
         priceErr.textContent = "";
     }
 
+    // The document is optional - only validate it if one was chosen.
+    let docMsg = "";
+    if (docFile.files.length && docFile.files[0].size > MAX_HW_DOC_BYTES) {
+        docMsg = "That file is too large. Maximum upload size is 25 MB.";
+    }
+    docFile.classList.toggle("has-error", !!docMsg);
+    docErr.textContent = docMsg;
+    if (docMsg) ok = false;
+
     return ok;
 }
 
+document.getElementById("hwDocFile").addEventListener("change", validateAddHardwareForm);
 document.getElementById("hwName").addEventListener("input", validateAddHardwareForm);
 document.getElementById("hwPrice").addEventListener("input", validateAddHardwareForm);
 

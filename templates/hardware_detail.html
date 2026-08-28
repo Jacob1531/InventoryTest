@@ -8,6 +8,7 @@
         <h2>{{ item.name }}</h2>
         <p class="page-subtitle">
             {{ item.hardware_type }}{% if item.manufacturer %} · {{ item.manufacturer }}{% endif %}{% if item.model %} {{ item.model }}{% endif %}
+            {%- if item.site or item.location %} · {{ item.site or "" }}{% if item.site and item.location %} / {% endif %}{{ item.location or "" }}{% endif %}
         </p>
     </div>
     <div style="align-self:center; display:flex; gap:8px; align-items:center;">
@@ -64,8 +65,12 @@
                 <input type="text" id="edSerial" name="serial_number" value="{{ item.serial_number or '' }}">
             </div>
             <div class="field">
+                <label for="edSite">Site</label>
+                <input type="text" id="edSite" name="site" value="{{ item.site or '' }}" placeholder="e.g. Main Office">
+            </div>
+            <div class="field">
                 <label for="edLocation">Location</label>
-                <input type="text" id="edLocation" name="location" value="{{ item.location or '' }}">
+                <input type="text" id="edLocation" name="location" value="{{ item.location or '' }}" placeholder="e.g. Room 204">
             </div>
             <div class="field">
                 <label for="edAssigned">Assigned To</label>

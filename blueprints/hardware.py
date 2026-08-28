@@ -95,6 +95,7 @@ def _read_item_form(form):
         "manufacturer": form.get("manufacturer", "").strip() or None,
         "model": form.get("model", "").strip() or None,
         "serial_number": form.get("serial_number", "").strip() or None,
+        "site": form.get("site", "").strip() or None,
         "location": form.get("location", "").strip() or None,
         "assigned_to": form.get("assigned_to", "").strip() or None,
         "purchase_date": purchase_date,
@@ -123,6 +124,7 @@ def hardware_warranty():
 
     summary = summarize_warranties(items)
     types_in_use = sorted({i.hardware_type for i in items if i.hardware_type})
+    sites_in_use = sorted({i.site for i in items if i.site})
 
     db.close()
     return render_template(
@@ -130,6 +132,7 @@ def hardware_warranty():
         items=items,
         summary=summary,
         types_in_use=types_in_use,
+        sites_in_use=sites_in_use,
         hardware_types=HARDWARE_TYPES,
         hardware_statuses=HARDWARE_STATUSES,
         title="Hardware & Warranty",
@@ -143,12 +146,41 @@ def add_hardware():
     if error:
         return error, 400
 
+    # An optional document can be attached at creation time. Validate it
+    # BEFORE writing anything, so a bad file doesn't leave a half-created
+    # item behind - more can always be added from the detail page later.
+    doc_file = request.files.get("document")
+    has_doc = bool(doc_file and doc_file.filename)
+    if has_doc and not is_allowed_submission_filename(doc_file.filename):
+        return "That file type isn't allowed.", 400
+
+    doc_name = request.form.get("document_name", "").strip()
+    doc_type = request.form.get("document_type", "").strip() or None
+
     db = SessionLocal()
     try:
         item = HardwareItem(is_active=True, **values)
         db.add(item)
+        db.flush()  # populates item.id before the document row references it
+
+        if has_doc:
+            blob_path = upload_submission_file(doc_file, prefix=BLOB_PREFIX)
+            db.add(HardwareDocument(
+                hardware_id=item.id,
+                # Fall back to the filename if no name was typed, so the
+                # document is never listed with a blank label.
+                name=doc_name or doc_file.filename,
+                doc_type=doc_type,
+                original_filename=doc_file.filename,
+                blob_path=blob_path,
+                uploaded_by=get_user(),
+            ))
+
         db.commit()
-        flash(f'"{values["name"]}" was added.', "success")
+        msg = f'"{values["name"]}" was added.'
+        if has_doc:
+            msg += " Document attached."
+        flash(msg, "success")
         return redirect(url_for("hardware.hardware_warranty"))
     except Exception as e:
         db.rollback()

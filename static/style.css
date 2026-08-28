@@ -641,9 +641,11 @@ button {
 
 .form-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 14px;
-    align-items: end;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px 14px;
+    /* start, not end: bottom-aligning items of unequal height left the
+       labels at ragged heights across a row. */
+    align-items: start;
 }
 
 .field {
@@ -656,10 +658,13 @@ button {
     font-size: 12.5px;
     font-weight: 500;
     color: var(--text-muted);
+    line-height: 1.4;
+    min-height: 18px;
 }
 
 input[type="text"],
 input[type="number"],
+input[type="date"],
 input[type="file"],
 select {
     font-family: inherit;
@@ -671,6 +676,24 @@ select {
     color: var(--text);
     transition: border-color 0.15s, box-shadow 0.15s;
     width: 100%;
+    /* One fixed height for every control type. Date pickers and file
+       inputs otherwise render taller than text inputs, which is what
+       pushed neighbouring fields out of alignment. */
+    height: 38px;
+    box-sizing: border-box;
+}
+
+/* The file input's button chrome needs the padding trimmed to sit
+   centred inside the shared 38px height. */
+input[type="file"] {
+    padding: 7px 10px;
+    font-size: 13px;
+}
+
+/* Date inputs render a native picker icon that inherits colour poorly
+   on dark backgrounds. */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.6);
 }
 
 input[type="text"]:focus,
@@ -684,11 +707,6 @@ select:focus,
     box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
-input[type="file"] {
-    padding: 6px 10px;
-    font-size: 13px;
-}
-
 input[type="text"].has-error,
 input[type="number"].has-error {
     border-color: var(--danger);
@@ -699,7 +717,10 @@ input[type="number"].has-error {
     display: block;
     font-size: 11.5px;
     color: var(--danger);
-    margin-top: 4px;
+}
+
+.field-error:empty {
+    display: none;
 }
 
 .form-error-banner {
@@ -821,7 +842,10 @@ input[type="number"].has-error {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    /* Horizontal scroll rather than overflow:hidden - a table wider than
+       its container used to have its last column silently clipped off
+       (the Delete button in Files). */
+    overflow-x: auto;
     box-shadow: var(--shadow-sm);
 }
 
@@ -1645,4 +1669,26 @@ input[type="number"].has-error {
     height: 15px;
     color: var(--text-faint);
     flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Form subsection - a secondary group inside a larger form
+   ========================================================================== */
+.form-subsection {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.form-subsection-title {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.form-subsection-hint {
+    margin: 2px 0 14px;
+    font-size: 12.5px;
+    color: var(--text-muted);
 }

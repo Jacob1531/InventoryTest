@@ -152,3 +152,14 @@ def create_hardware_tables_once():
 def create_dashboard_pref_table_once():
     DashboardPreference.__table__.create(bind=engine, checkfirst=True)
     return "dashboard_preference table created (or already existed) - remove this route now."
+
+
+# ONE-TIME MIGRATION - visit this URL once to add the "site" column to
+# hardware_item (the table predates it), then DELETE THIS ROUTE.
+@bp.route("/add-hardware-site-column-once")
+def add_hardware_site_column_once():
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE hardware_item ADD COLUMN IF NOT EXISTS site VARCHAR"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_hardware_item_site ON hardware_item (site)"))
+        conn.commit()
+    return "site column added (or already existed) - remove this route now."

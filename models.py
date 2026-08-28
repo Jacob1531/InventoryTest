@@ -99,7 +99,8 @@ class HardwareItem(Base):
     manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
     serial_number = Column(String, nullable=True)
-    location = Column(String, nullable=True)
+    site = Column(String, nullable=True, index=True)   # which building/site
+    location = Column(String, nullable=True)           # room/area within that site
     assigned_to = Column(String, nullable=True)
     purchase_date = Column(Date, nullable=True)
     purchase_price = Column(Numeric, nullable=True)
