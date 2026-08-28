@@ -25,11 +25,11 @@
             <tr>
                 <th>Item</th>
                 <th>Category</th>
-                <th>Quantity</th>
-                <th>Threshold</th>
-                <th>Price</th>
+                <th class="num">Quantity</th>
+                <th class="num">Threshold</th>
+                <th class="num">Price</th>
                 <th>Status</th>
-                <th>On Order</th>
+                <th class="num">On Order</th>
                 {% if can_order %}<th class="no-export"></th>{% endif %}
             </tr>
         </thead>
@@ -38,9 +38,9 @@
             <tr>
                 <td>{{ item.name }}</td>
                 <td>{{ item.category }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>{{ item.low_stock_threshold }}</td>
-                <td>${{ item.price }}</td>
+                <td class="num">{{ item.quantity }}</td>
+                <td class="num">{{ item.low_stock_threshold }}</td>
+                <td class="num">${{ item.price }}</td>
                 <td>
                     {% if item.is_out %}
                         <span class="badge badge-out">Out of Stock</span>
@@ -48,7 +48,7 @@
                         <span class="badge badge-low">Low Stock</span>
                     {% endif %}
                 </td>
-                <td>{{ item.on_order if item.on_order else "-" }}</td>
+                <td class="num">{{ item.on_order if item.on_order else "-" }}</td>
                 {% if can_order %}
                 <td>
                     <button type="button" class="btn btn-secondary" data-id="{{ item.id }}" data-name="{{ item.name }}" onclick="openOrderModal(this)">Place Order</button>
@@ -157,7 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 {% else %}
-<div class="empty-state">Nothing is currently low on stock.</div>
+<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>Nothing is currently low on stock.</div>
 {% endif %}
 
 {% endblock %}

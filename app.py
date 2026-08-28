@@ -23,10 +23,11 @@ The URLs themselves are unchanged.
 """
 import os
 
-from flask import Flask
+from flask import Flask, g, request
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 from auth import get_user
+from permissions import can_view_hardware_warranty
 
 from blueprints.main import bp as main_bp
 from blueprints.inventory import bp as inventory_bp
@@ -95,12 +96,53 @@ def file_too_large(e):
     return "That file is too large. Maximum upload size is 25 MB.", 413
 
 
+# The header nav. Kept here rather than hard-coded in the template so the
+# active-section logic stays declarative: each entry lists the blueprints
+# that should light it up. Inventory covers orders and the Excel import
+# flow too, since those live under it conceptually.
+NAV_ITEMS = [
+    {"label": "Dashboard", "endpoint": "main.dashboard",              "blueprints": {"main"}},
+    {"label": "Inventory", "endpoint": "inventory.inventory",         "blueprints": {"inventory", "orders", "imports"}},
+    {"label": "Reports",   "endpoint": "reports.reports",             "blueprints": {"reports"}},
+    {"label": "Files",     "endpoint": "files.files",                 "blueprints": {"files"}},
+    {"label": "Hardware",  "endpoint": "hardware.hardware_warranty",  "blueprints": {"hardware"},
+     "requires_elevated": True},
+    {"label": "Settings",  "endpoint": "settings.settings",           "blueprints": {"settings"}},
+]
+
+
+def _nav_can_see_hardware():
+    """Memoised per request via flask.g. The nav renders on every page, and
+    several places may ask the same question during one request - this
+    keeps it to at most one Graph call per request rather than per lookup.
+
+    Note this does mean one membership check per page load. If that ever
+    feels slow, caching the result in the session (with the user id stored
+    alongside it, so a shared browser can't inherit someone else's answer)
+    is the next step."""
+    if not hasattr(g, "_nav_hardware_ok"):
+        g._nav_hardware_ok = can_view_hardware_warranty()
+    return g._nav_hardware_ok
+
+
 @app.context_processor
 def inject_current_user():
-    """Makes the signed-in user's identity available in every template
-    (used by the header's account chip) without passing it through every
-    single render_template call."""
-    return {"header_user": get_user()}
+    """Makes the signed-in user's identity and the header nav available in
+    every template, without threading them through every single
+    render_template call."""
+    active = request.blueprint
+
+    nav = []
+    for item in NAV_ITEMS:
+        if item.get("requires_elevated") and not _nav_can_see_hardware():
+            continue
+        nav.append({
+            "label": item["label"],
+            "endpoint": item["endpoint"],
+            "active": active in item["blueprints"],
+        })
+
+    return {"header_user": get_user(), "nav_items": nav}
 
 
 if __name__ == "__main__":

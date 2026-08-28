@@ -135,7 +135,24 @@
             {% for item in items %}
             <tr data-type="{{ item.hardware_type }}" data-warranty="{{ item.warranty_state }}">
                 <td>{{ item.name }}</td>
-                <td>{{ item.hardware_type }}</td>
+                <td>
+                    <span class="type-cell">
+                        {% if item.hardware_type in ['Computer','Laptop'] %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="12" rx="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
+                        {% elif item.hardware_type == 'Monitor' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        {% elif item.hardware_type == 'Printer' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        {% elif item.hardware_type == 'Networking' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                        {% elif item.hardware_type == 'Phone' %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                        {% else %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+                        {% endif %}
+                        {{ item.hardware_type }}
+                    </span>
+                </td>
                 <td>{{ item.serial_number or "-" }}</td>
                 <td>{{ item.location or "-" }}</td>
                 <td><span class="badge badge-hw-{{ item.status|lower }}">{{ item.status|replace('_',' ')|title }}</span></td>
@@ -255,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 {% else %}
-<div class="empty-state">No hardware recorded yet. Add your first item above.</div>
+<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>No hardware recorded yet. Add your first item above.</div>
 {% endif %}
 
 <script>

@@ -24,16 +24,15 @@
         <thead>
             <tr>
                 <th>Item</th>
-                <th>Current Quantity</th>
-                <th>Low Stock Threshold</th>
-                <th class="no-export"></th>
+                <th class="num">Current Quantity</th>
+                <th class="no-export">Low Stock Threshold</th>
             </tr>
         </thead>
         <tbody>
             {% for item in items %}
             <tr>
                 <td>{{ item.name }}</td>
-                <td>{{ item.quantity }}</td>
+                <td class="num">{{ item.quantity }}</td>
                 <td>
                     <form method="POST" action="{{ url_for('settings.update_threshold', item_id=item.id) }}" style="display:flex; gap:8px; align-items:center;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -49,7 +48,7 @@
     </table>
 </div>
 {% else %}
-<div class="empty-state">No inventory items to configure yet.</div>
+<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></div>No inventory items to configure yet.</div>
 {% endif %}
 
 <div class="page-header" style="margin-top:36px;">
@@ -73,8 +72,8 @@
             <tr>
                 <th>Item</th>
                 <th>Category</th>
-                <th>Quantity</th>
-                <th>Price</th>
+                <th class="num">Quantity</th>
+                <th class="num">Price</th>
                 <th class="no-export"></th>
             </tr>
         </thead>
@@ -83,8 +82,8 @@
             <tr>
                 <td>{{ item.name }}</td>
                 <td>{{ item.category }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>${{ item.price }}</td>
+                <td class="num">{{ item.quantity }}</td>
+                <td class="num">${{ item.price }}</td>
                 <td>
                     <form method="POST" action="{{ url_for('settings.purge_inactive_item', item_id=item.id) }}"
                           onsubmit="return confirm('Permanently delete &quot;{{ item.name }}&quot;? Its history will remain in Reports, but this cannot be undone.');">
@@ -98,7 +97,7 @@
     </table>
 </div>
 {% else %}
-<div class="empty-state">No inactive items right now.</div>
+<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>No inactive items right now.</div>
 {% endif %}
 
 {% endblock %}
