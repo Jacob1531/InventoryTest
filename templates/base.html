@@ -11,6 +11,10 @@
             if (localStorage.getItem("theme") === "dark") {
                 document.documentElement.setAttribute("data-theme", "dark");
             }
+            var iv = localStorage.getItem("inventoryView");
+            if (iv === "compact" || iv === "list") {
+                document.documentElement.setAttribute("data-inv-view", iv);
+            }
         })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
