@@ -17,7 +17,6 @@ from services.chart_data import build_chart, DEFAULT_LIMIT, DEFAULT_MODE
 from services.audit_helpers import format_eastern, resolve_item_name, week_ago_cutoff
 from services.order_logic import compute_on_order_totals
 from auth import get_user
-from permissions import can_view_hardware_warranty
 
 bp = Blueprint("main", __name__)
 
@@ -88,7 +87,6 @@ def dashboard():
         stats=stats,
         recent_logs=recent_logs,
         chart=chart,
-        can_view_hardware_warranty=can_view_hardware_warranty(),
     )
 
 
