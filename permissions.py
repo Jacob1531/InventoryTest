@@ -85,3 +85,21 @@ def can_view_hardware_warranty():
     except GroupCheckError as e:
         print(f"Hardware & Warranty visibility check failed, denying: {e}")
         return False
+
+
+def is_basic_user():
+    """True if the signed-in user is in the basic-permissions group.
+
+    The inverse of the can_* helpers above, provided separately so callers
+    that RESTRICT rather than PERMIT read naturally (no double negatives).
+
+    Fails closed in the restrictive direction: if membership can't be
+    determined, the user is treated AS basic, so they see less rather than
+    more. Note this is the opposite boolean from can_place_orders() and
+    friends, but the same underlying principle - an error should never
+    grant visibility."""
+    try:
+        return is_basic_permissions_user(get_user_id())
+    except GroupCheckError as e:
+        print(f"Basic-user check failed, treating as basic (showing less): {e}")
+        return True

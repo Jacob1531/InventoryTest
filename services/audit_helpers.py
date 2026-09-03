@@ -62,3 +62,18 @@ def resolve_item_name(item_names, item_id):
     from, so this keeps that history legible instead of showing "47"."""
     name = item_names.get(item_id)
     return name if name is not None else f"Item #{item_id} (deleted)"
+
+
+# Audit actions produced by elevated-only sections. Basic-permissions users
+# can't perform these and shouldn't see them in history either - PURGE comes
+# from Database Settings, which they can't reach at all. Kept as a set so
+# future admin-only actions only need adding here.
+ELEVATED_ONLY_ACTIONS = {"PURGE"}
+
+
+def hidden_actions_for(is_basic):
+    """The audit actions this user must NOT see - i.e. the set to exclude
+    from a query. Empty for elevated users. Callers filter at the query
+    level so hidden rows are never fetched, rather than being dropped in
+    the template where they'd still reach the browser."""
+    return ELEVATED_ONLY_ACTIONS if is_basic else set()

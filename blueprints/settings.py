@@ -12,12 +12,13 @@ import os
 from flask import Blueprint, flash, redirect, render_template, request, send_from_directory, url_for
 from db import SessionLocal
 from models import DashboardPreference, Inventory, InventoryAudit
-from services.audit_helpers import format_audit_value, format_eastern, resolve_item_name
+from services.audit_helpers import (format_audit_value, format_eastern, hidden_actions_for,
+                                    resolve_item_name)
 from services.chart_data import (DEFAULT_LIMIT, DEFAULT_MODE, MODE_LABELS, VALID_LIMITS,
                                  normalize_limit, normalize_mode)
 from services.group_access import GroupCheckError, is_basic_permissions_user
 from auth import get_user, get_user_id
-from permissions import require_elevated_access
+from permissions import is_basic_user, require_elevated_access
 
 bp = Blueprint("settings", __name__)
 
@@ -156,12 +157,13 @@ def account_settings():
 
     db = SessionLocal()
     item_names = {str(item.id): item.name for item in db.query(Inventory).all()}
-    my_logs = (
-        db.query(InventoryAudit)
-        .filter(InventoryAudit.changed_by == current_user)
-        .order_by(InventoryAudit.changed_at.desc())
-        .all()
-    )
+    # Also filtered: a user who performed purges while elevated and was
+    # later moved to basic permissions shouldn't still see them here.
+    hidden = hidden_actions_for(is_basic_user())
+    my_log_query = db.query(InventoryAudit).filter(InventoryAudit.changed_by == current_user)
+    if hidden:
+        my_log_query = my_log_query.filter(InventoryAudit.action.notin_(hidden))
+    my_logs = my_log_query.order_by(InventoryAudit.changed_at.desc()).all()
     for log in my_logs:
         log.item_name = resolve_item_name(item_names, log.item_id)
         log.changed_at_display = format_eastern(log.changed_at, fmt="%Y-%m-%d %I:%M %p %Z")
@@ -196,6 +198,7 @@ def account_settings():
         available_categories=available_categories,
         chart_modes=MODE_LABELS,
         chart_limits=VALID_LIMITS,
+        show_purge_filter=not hidden,
         title="Account Settings",
     )
 

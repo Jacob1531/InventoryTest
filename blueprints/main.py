@@ -14,7 +14,9 @@ from db import SessionLocal, engine
 from models import (DashboardPreference, FileSubmission, HardwareDocument, HardwareItem,
                     HardwareNote, Inventory, InventoryAudit, InventoryOrder)
 from services.chart_data import build_chart, DEFAULT_LIMIT, DEFAULT_MODE
-from services.audit_helpers import format_eastern, resolve_item_name, week_ago_cutoff
+from permissions import is_basic_user
+from services.audit_helpers import (format_eastern, hidden_actions_for, resolve_item_name,
+                                    week_ago_cutoff)
 from services.order_logic import compute_on_order_totals
 from auth import get_user
 
@@ -42,8 +44,14 @@ def dashboard():
     )
 
     item_names = {str(item.id): item.name for item in db.query(Inventory).all()}
+    # Same elevated-only filtering as the Reports page, so a basic user's
+    # Recent Activity can't surface a PURGE they aren't allowed to see.
+    hidden = hidden_actions_for(is_basic_user())
+    recent_query = db.query(InventoryAudit)
+    if hidden:
+        recent_query = recent_query.filter(InventoryAudit.action.notin_(hidden))
     recent_logs = (
-        db.query(InventoryAudit)
+        recent_query
         .order_by(InventoryAudit.changed_at.desc())
         .limit(5)
         .all()

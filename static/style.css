@@ -414,6 +414,11 @@ button {
     align-items: center;
     justify-content: center;
     gap: 6px;
+    /* Labels were breaking mid-phrase ("Export to / Excel"), which reads
+       as broken rather than compact. The toolbar wraps as whole buttons
+       instead. */
+    white-space: nowrap;
+    flex-shrink: 0;
     padding: 9px 16px;
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
@@ -422,6 +427,10 @@ button {
     cursor: pointer;
     transition: background-color 0.15s, border-color 0.15s, color 0.15s;
     text-decoration: none;
+}
+
+.btn svg {
+    flex-shrink: 0;
 }
 
 .btn-primary {
@@ -515,6 +524,8 @@ button {
 .inventory-toolbar-actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .inventory-grid {
@@ -1860,5 +1871,94 @@ input[type="number"].has-error {
     [data-inv-view="list"] .item-category,
     [data-inv-view="list"] .on-order-badge {
         display: none;
+    }
+}
+
+/* ==========================================================================
+   Missing-image placeholder
+   --------------------------------------------------------------------------
+   Drawn in CSS rather than served as a flat white PNG. A white rectangle
+   read as "image failed to load" next to real product photos, and looked
+   harsh against the dark theme. This adapts to both themes automatically
+   and scales cleanly across the three inventory view densities.
+   ========================================================================== */
+.item-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 9px,
+            var(--surface) 9px,
+            var(--surface) 18px
+        ),
+        var(--surface-muted);
+    color: var(--text-faint);
+}
+
+.item-placeholder svg {
+    width: 30%;
+    max-width: 46px;
+    min-width: 20px;
+    height: auto;
+    opacity: 0.65;
+}
+
+[data-inv-view="list"] .item-placeholder svg {
+    width: 22px;
+    min-width: 22px;
+}
+
+/* ==========================================================================
+   Dashboard two-column layout
+   --------------------------------------------------------------------------
+   Chart on the left, recent activity alongside it. Collapses to a single
+   stacked column on narrower screens, where side-by-side would squeeze
+   both into unreadable widths.
+   ========================================================================== */
+.dashboard-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 24px;
+    align-items: start;
+}
+
+.dashboard-col-main,
+.dashboard-col-side {
+    min-width: 0;
+}
+
+/* The section headers already carry their own top margin; inside the
+   columns they should sit flush with the top of the row. */
+.dashboard-columns .chart-header {
+    margin-top: 0;
+}
+
+.dashboard-col-side .activity-item {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+}
+
+.dashboard-col-side .activity-time {
+    width: 100%;
+    padding-left: 0;
+}
+
+@media (max-width: 980px) {
+    .dashboard-columns {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .dashboard-col-side .activity-item {
+        flex-wrap: nowrap;
+    }
+
+    .dashboard-col-side .activity-time {
+        width: auto;
     }
 }

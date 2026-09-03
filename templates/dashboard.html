@@ -23,49 +23,54 @@
     </a>
 </div>
 
-{% if chart.rows %}
-<div class="chart-header">
-    <h3 class="section-heading" style="margin:0;">{{ chart.title }}</h3>
-    <div class="chart-header-right">
-        <span class="chart-unit">{{ chart.value_label }}</span>
-        <a href="{{ url_for('settings.account_settings') }}#dashboard-chart" class="chart-configure" title="Change what this chart shows">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Configure
-        </a>
-    </div>
-</div>
-<div class="chart-panel">
-    {% for row in chart.rows %}
-    <div class="chart-row">
-        <span class="chart-label" title="{{ row.label }}">{{ row.label }}</span>
-        <div class="chart-track">
-            <div class="chart-bar" style="width: {{ row.percent }}%;"></div>
+<div class="dashboard-columns">
+    <section class="dashboard-col-main">
+        <div class="chart-header">
+            <h3 class="section-heading" style="margin:0;">{{ chart.title }}</h3>
+            <div class="chart-header-right">
+                {% if chart.rows %}<span class="chart-unit">{{ chart.value_label }}</span>{% endif %}
+                <a href="{{ url_for('settings.account_settings') }}#dashboard-chart" class="chart-configure" title="Change what this chart shows">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Configure
+                </a>
+            </div>
         </div>
-        <span class="chart-value">{{ row.count }}</span>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="chart-header">
-    <h3 class="section-heading" style="margin:0;">{{ chart.title }}</h3>
-    <div class="chart-header-right">
-        <a href="{{ url_for('settings.account_settings') }}#dashboard-chart" class="chart-configure">Configure</a>
-    </div>
-</div>
-<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 19v-6"/><path d="M12 19V6"/><path d="M17 19v-10"/></svg></div>Nothing to show for these chart settings yet.</div>
-{% endif %}
+        {% if chart.rows %}
+        <div class="chart-panel">
+            {% for row in chart.rows %}
+            <div class="chart-row">
+                <span class="chart-label" title="{{ row.label }}">{{ row.label }}</span>
+                <div class="chart-track">
+                    <div class="chart-bar" style="width: {{ row.percent }}%;"></div>
+                </div>
+                <span class="chart-value">{{ row.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 19v-6"/><path d="M12 19V6"/><path d="M17 19v-10"/></svg></div>Nothing to show for these chart settings yet.</div>
+        {% endif %}
+    </section>
 
-{% if recent_logs %}
-<h3 class="section-heading" style="margin-top:28px;">Recent Activity</h3>
-<div class="activity-list">
-    {% for log in recent_logs %}
-    <div class="activity-item">
-        <span class="badge badge-{{ log.action|lower }}">{{ log.action }}</span>
-        <span class="activity-text"><strong>{{ log.item_name }}</strong>{% if log.field_name %} &mdash; {{ log.field_name }} changed{% endif %}</span>
-        <span class="activity-time">{{ log.changed_at_display }}</span>
-    </div>
-    {% endfor %}
+    <aside class="dashboard-col-side">
+        <div class="chart-header">
+            <h3 class="section-heading" style="margin:0;">Recent Activity</h3>
+            <a href="{{ url_for('reports.reports') }}" class="chart-configure">View all</a>
+        </div>
+        {% if recent_logs %}
+        <div class="activity-list">
+            {% for log in recent_logs %}
+            <div class="activity-item">
+                <span class="badge badge-{{ log.action|lower }}">{{ log.action }}</span>
+                <span class="activity-text"><strong>{{ log.item_name }}</strong>{% if log.field_name %} &mdash; {{ log.field_name }} changed{% endif %}</span>
+                <span class="activity-time">{{ log.changed_at_display }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>No activity recorded yet.</div>
+        {% endif %}
+    </aside>
 </div>
-{% endif %}
 
 {% endblock %}

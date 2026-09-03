@@ -14,15 +14,25 @@ from models import FileSubmission
 from services.audit_helpers import format_eastern
 from services.file_handler import delete_submission_file, generate_file_url, is_allowed_submission_filename, upload_submission_file
 from auth import get_user
-from permissions import can_delete_files
+from permissions import can_delete_files, is_basic_user
 
 bp = Blueprint("files", __name__)
 
 
 @bp.route("/files")
 def files():
+    # Basic-permissions users only see their own uploads. Scoping the QUERY
+    # (rather than hiding rows in the template) also means the download URL
+    # for someone else's file is never generated or sent to them - the SAS
+    # link only exists for files they can see.
+    own_files_only = is_basic_user()
+    current_user = get_user()
+
     db = SessionLocal()
-    submissions = db.query(FileSubmission).order_by(FileSubmission.uploaded_at.desc()).all()
+    query = db.query(FileSubmission)
+    if own_files_only:
+        query = query.filter(FileSubmission.uploaded_by == current_user)
+    submissions = query.order_by(FileSubmission.uploaded_at.desc()).all()
 
     for submission in submissions:
         submission.uploaded_at_display = format_eastern(submission.uploaded_at, fmt="%Y-%m-%d %I:%M %p %Z")
@@ -36,6 +46,7 @@ def files():
         submissions=submissions,
         categories=categories,
         can_delete=can_delete_files(),
+        own_files_only=own_files_only,
         title="Files",
     )
 

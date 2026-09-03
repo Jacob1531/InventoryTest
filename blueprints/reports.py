@@ -11,7 +11,9 @@ their location moved. Endpoint names are now namespaced as
 from flask import Blueprint, render_template
 from db import SessionLocal
 from models import Inventory, InventoryAudit
-from services.audit_helpers import format_audit_value, format_eastern, resolve_item_name, week_ago_cutoff
+from permissions import is_basic_user
+from services.audit_helpers import (format_audit_value, format_eastern, hidden_actions_for,
+                                    resolve_item_name, week_ago_cutoff)
 
 bp = Blueprint("reports", __name__)
 
@@ -41,7 +43,13 @@ def added_this_week_items():
 @bp.route("/reports")
 def reports():
     db = SessionLocal()
-    logs = db.query(InventoryAudit).order_by(InventoryAudit.changed_at.desc()).all()
+    # Hide elevated-only actions (PURGE) from basic-permissions users.
+    # Filtered in the query, so those rows never reach the page at all.
+    hidden = hidden_actions_for(is_basic_user())
+    log_query = db.query(InventoryAudit)
+    if hidden:
+        log_query = log_query.filter(InventoryAudit.action.notin_(hidden))
+    logs = log_query.order_by(InventoryAudit.changed_at.desc()).all()
 
     # Map item_id -> item name for display
     item_names = {
@@ -56,4 +64,4 @@ def reports():
         log.new_value_display = format_audit_value(log.field_name, log.new_value)
 
     db.close()
-    return render_template("reports.html", logs=logs, title="Reports")
+    return render_template("reports.html", logs=logs, show_purge_filter=not hidden, title="Reports")
