@@ -139,10 +139,13 @@ button {
 /* ==========================================================================
    Header
    ========================================================================== */
-.top-bar {
+.app-chrome {
     position: sticky;
     top: 0;
     z-index: 100;
+}
+
+.top-bar {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
@@ -1593,9 +1596,6 @@ input[type="number"].has-error {
    the header's own height, so the nav parks right beneath it on scroll.
    ========================================================================== */
 .main-nav {
-    position: sticky;
-    top: 66px;
-    z-index: 99;
     background: var(--header-bg-end);
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
@@ -1962,3 +1962,69 @@ input[type="number"].has-error {
         width: auto;
     }
 }
+
+/* ==========================================================================
+   Category colours (DCS logo palette)
+   --------------------------------------------------------------------------
+   Six slots derived from the DCS logo: blue, orange, purple, green, red,
+   pink. A category's slot is computed from its name in
+   services/category_colors.py, so the same category is the same colour
+   everywhere it appears - inventory pills, chart bars, file categories -
+   with no configuration and nothing to migrate.
+
+   Every text/tint pair below clears WCAG AA (4.5:1); the lowest is 5.03.
+   ========================================================================== */
+.item-category.cat-0 { background: #e8f4f9; color: #0f6f95; border-color: #cbe6f2; }
+.item-category.cat-1 { background: #fdf1e3; color: #8f5209; border-color: #f5ddbe; }
+.item-category.cat-2 { background: #f5eaf5; color: #7a2a7a; border-color: #e6cfe6; }
+.item-category.cat-3 { background: #e9f7ec; color: #1c6e31; border-color: #c9e9d2; }
+.item-category.cat-4 { background: #fdeaea; color: #a81414; border-color: #f5cccc; }
+.item-category.cat-5 { background: #f9edf4; color: #8e4278; border-color: #ecd4e3; }
+/* no category -> deliberately neutral rather than an arbitrary colour */
+.item-category.cat-none {
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    border-color: var(--border);
+}
+
+/* On dark surfaces the light tints would glare, so the same hues are used
+   as translucent washes with a lighter text colour instead. */
+[data-theme="dark"] .item-category.cat-0 { background: rgba(24,144,192,0.16);  color: #7dd3fc; border-color: rgba(24,144,192,0.38); }
+[data-theme="dark"] .item-category.cat-1 { background: rgba(240,144,24,0.16);  color: #fbbf24; border-color: rgba(240,144,24,0.38); }
+[data-theme="dark"] .item-category.cat-2 { background: rgba(144,48,144,0.18);  color: #e0a3e0; border-color: rgba(144,48,144,0.42); }
+[data-theme="dark"] .item-category.cat-3 { background: rgba(48,168,72,0.16);   color: #6ee7a0; border-color: rgba(48,168,72,0.38); }
+[data-theme="dark"] .item-category.cat-4 { background: rgba(192,24,24,0.18);   color: #fca5a5; border-color: rgba(192,24,24,0.42); }
+[data-theme="dark"] .item-category.cat-5 { background: rgba(192,120,168,0.18); color: #f0b6d8; border-color: rgba(192,120,168,0.42); }
+
+/* Chart bars use the saturated logo colours directly - they sit on the
+   neutral track, not behind text, so full saturation is safe here. */
+.chart-bar.cat-bar-0 { background: #1890c0; }
+.chart-bar.cat-bar-1 { background: #f09018; }
+.chart-bar.cat-bar-2 { background: #903090; }
+.chart-bar.cat-bar-3 { background: #30a848; }
+.chart-bar.cat-bar-4 { background: #c01818; }
+.chart-bar.cat-bar-5 { background: #c078a8; }
+.chart-bar.cat-bar-none { background: var(--text-faint); }
+
+/* ==========================================================================
+   Brand strip
+   --------------------------------------------------------------------------
+   The logo's palette rendered as a thin band between the header and the
+   nav - the one place the full range of brand colour appears, so the
+   chrome is recognisably DCS without repeating the logo itself.
+   ========================================================================== */
+.brand-strip {
+    display: flex;
+    height: 3px;
+}
+
+.brand-strip span {
+    flex: 1;
+}
+
+.brand-strip span:nth-child(1) { background: #1890c0; }
+.brand-strip span:nth-child(2) { background: #30a848; }
+.brand-strip span:nth-child(3) { background: #f0a818; }
+.brand-strip span:nth-child(4) { background: #f09018; }
+.brand-strip span:nth-child(5) { background: #c01818; }
+.brand-strip span:nth-child(6) { background: #903090; }

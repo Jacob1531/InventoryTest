@@ -41,7 +41,7 @@
             <div class="chart-row">
                 <span class="chart-label" title="{{ row.label }}">{{ row.label }}</span>
                 <div class="chart-track">
-                    <div class="chart-bar" style="width: {{ row.percent }}%;"></div>
+                    <div class="chart-bar cat-bar-{{ row.color_key|category_color }}" style="width: {{ row.percent }}%;"></div>
                 </div>
                 <span class="chart-value">{{ row.count }}</span>
             </div>

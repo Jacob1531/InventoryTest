@@ -67,7 +67,7 @@
                 <span class="stock-flag flag-low">Low Stock</span>
             {% endif %}
             <p class="item-name">{{ item.name }}</p>
-            <span class="item-category">{{ item.category }}</span>
+            <span class="item-category cat-{{ item.category|category_color }}">{{ item.category }}</span>
             <div class="item-meta">
                 <span class="item-qty">Qty: <strong>{{ item.quantity }}</strong></span>
                 <span class="item-price">${{ item.price }}</span>

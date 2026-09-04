@@ -95,7 +95,14 @@ def test_no_other_bucket_when_within_limit():
 
 def test_every_row_has_the_expected_keys():
     for row in category_breakdown(_items(Food=2)):
-        assert set(row) == {"label", "count", "percent"}
+        assert set(row) == {"label", "count", "percent", "color_key"}
+
+
+def test_category_mode_rows_are_coloured_by_their_own_label():
+    """In category mode the label IS the category, so it doubles as the
+    colour key."""
+    for row in category_breakdown(_items(Food=2, Cleaning=1)):
+        assert row["color_key"] == row["label"]
 
 
 def test_percent_never_exceeds_one_hundred():
@@ -238,3 +245,13 @@ def test_build_chart_category_mode_still_works():
     chart = build_chart(_inventory(), mode=MODE_CATEGORY)
     labels = [r["label"] for r in chart["rows"]]
     assert set(labels) == {"Baby", "Cleaning"}
+
+
+def test_item_level_modes_colour_by_the_items_category():
+    """In low-stock/on-order/recent modes the label is an ITEM name, so the
+    colour key must be that item's category - otherwise a bar wouldn't
+    match its category's pill elsewhere in the app."""
+    chart = build_chart(_inventory(), mode=MODE_LOW_STOCK)
+    by_label = {r["label"]: r["color_key"] for r in chart["rows"]}
+    assert by_label["Diapers"] == "Baby"
+    assert by_label["Bleach"] == "Cleaning"

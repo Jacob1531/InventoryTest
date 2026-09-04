@@ -67,19 +67,24 @@ def _item_category(item):
 
 
 def _with_percentages(rows):
-    """rows: list of (label, value). Returns the chart row dicts, with
-    percent relative to the largest value present."""
+    """rows: list of (label, value, color_key). Returns the chart row
+    dicts, with percent relative to the largest value present.
+
+    color_key is the CATEGORY a row should be coloured by - which is the
+    label itself in category mode, but the item's category in the
+    item-level modes, so a bar always matches its category's pill."""
     if not rows:
         return []
-    largest = max(value for _, value in rows)
+    largest = max(value for _, value, _ in rows)
     return [
         {
             "label": label,
             "count": value,
+            "color_key": color_key,
             # guard against divide-by-zero when every value is 0
             "percent": round((value / largest) * 100) if largest else 0,
         }
-        for label, value in rows
+        for label, value, color_key in rows
     ]
 
 
@@ -107,7 +112,7 @@ def category_breakdown(items, limit=DEFAULT_LIMIT):
     if remainder:
         top.append(("Other", sum(count for _, count in remainder)))
 
-    return _with_percentages(top)
+    return _with_percentages([(label, count, label) for label, count in top])
 
 
 def lowest_stock(items, limit=DEFAULT_LIMIT):
@@ -118,7 +123,7 @@ def lowest_stock(items, limit=DEFAULT_LIMIT):
         (i for i in items if i.quantity is not None),
         key=lambda i: (i.quantity, (i.name or "").lower()),
     )[:limit]
-    return _with_percentages([(i.name, i.quantity) for i in ranked])
+    return _with_percentages([(i.name, i.quantity, _item_category(i)) for i in ranked])
 
 
 def on_order(items, on_order_totals, limit=DEFAULT_LIMIT):
@@ -129,7 +134,7 @@ def on_order(items, on_order_totals, limit=DEFAULT_LIMIT):
     for item in items:
         pending = on_order_totals.get(item.id, 0)
         if pending > 0:
-            rows.append((item.name, pending))
+            rows.append((item.name, pending, _item_category(item)))
     rows.sort(key=lambda r: (-r[1], (r[0] or "").lower()))
     return _with_percentages(rows[:limit])
 
@@ -147,7 +152,7 @@ def recently_added(items, limit=DEFAULT_LIMIT):
     ranked = ([i for i in ranked if getattr(i, "created_at", None) is not None]
               + [i for i in ranked if getattr(i, "created_at", None) is None])
     ranked = ranked[:limit]
-    return _with_percentages([(i.name, i.quantity or 0) for i in ranked])
+    return _with_percentages([(i.name, i.quantity or 0, _item_category(i)) for i in ranked])
 
 
 def build_chart(items, mode=DEFAULT_MODE, category=None, limit=DEFAULT_LIMIT,

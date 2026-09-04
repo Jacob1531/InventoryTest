@@ -93,7 +93,7 @@
                         {{ submission.original_filename }}
                     </span>
                 </td>
-                <td>{{ submission.category or "-" }}</td>
+                <td>{% if submission.category %}<span class="item-category cat-{{ submission.category|category_color }}">{{ submission.category }}</span>{% else %}-{% endif %}</td>
                 <td>{{ submission.uploaded_by }}</td>
                 <td>{{ submission.uploaded_at_display }}</td>
                 <td>

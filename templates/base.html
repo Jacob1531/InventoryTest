@@ -31,6 +31,7 @@
 </head>
 <body>
 
+<div class="app-chrome">
 <header class="top-bar">
     <a href="{{ url_for('main.dashboard') }}" class="brand">
         <img src="{{ url_for('static', filename='diaspora_logo.png') }}" alt="Logo" class="brand-logo">
@@ -46,6 +47,10 @@
     </a>
 </header>
 
+<div class="brand-strip" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span><span></span>
+</div>
+
 <nav class="main-nav" aria-label="Sections">
     <div class="main-nav-inner">
         {% for item in nav_items %}
@@ -55,6 +60,7 @@
         {% endfor %}
     </div>
 </nav>
+</div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}

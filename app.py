@@ -27,6 +27,7 @@ from flask import Flask, g, request
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 from auth import get_user
+from services.category_colors import category_color
 from permissions import can_view_hardware_warranty
 
 from blueprints.main import bp as main_bp
@@ -61,6 +62,11 @@ app.config["WTF_CSRF_TIME_LIMIT"] = 28800
 # Files and is far more than inventory images or Excel imports need, so
 # this shouldn't affect any existing upload path.
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+
+# Categories get a stable colour derived from their name (see
+# services/category_colors.py). Exposed as a filter so templates can
+# write `category|category_color` wherever a category is shown.
+app.jinja_env.filters["category_color"] = category_color
 
 app.register_blueprint(main_bp)
 app.register_blueprint(inventory_bp)
