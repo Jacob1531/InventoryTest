@@ -2014,17 +2014,10 @@ input[type="number"].has-error {
    chrome is recognisably DCS without repeating the logo itself.
    ========================================================================== */
 .brand-strip {
-    display: flex;
     height: 3px;
+    /* A two-stop gradient between the logo's blue and purple. The full
+       six-colour version blended through olive and maroon - intermediate
+       hues that aren't in the logo at all - so this keeps the sweep clean
+       while still reading as brand colour rather than a UI accent. */
+    background: linear-gradient(90deg, #1890c0, #903090);
 }
-
-.brand-strip span {
-    flex: 1;
-}
-
-.brand-strip span:nth-child(1) { background: #1890c0; }
-.brand-strip span:nth-child(2) { background: #30a848; }
-.brand-strip span:nth-child(3) { background: #f0a818; }
-.brand-strip span:nth-child(4) { background: #f09018; }
-.brand-strip span:nth-child(5) { background: #c01818; }
-.brand-strip span:nth-child(6) { background: #903090; }
