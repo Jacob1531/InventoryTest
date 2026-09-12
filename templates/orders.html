@@ -6,56 +6,93 @@
 <div class="page-header">
     <div>
         <h2>Orders</h2>
-        <p class="page-subtitle">Stock on order. Marking an order received adds its quantity to the item automatically.</p>
+        <p class="page-subtitle">Order forms and the deliveries received against them.</p>
     </div>
+    {% if can_order %}
+    <div style="align-self:center;">
+        <a href="{{ url_for('orders.new_order_form') }}" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Order Form
+        </a>
+    </div>
+    {% endif %}
 </div>
 
-{% if orders %}
-<div class="filters">
-    <input type="text" id="ordersSearch" placeholder="Search by item, notes..." onkeyup="filterOrders()" class="search-box">
-    <select id="ordersStatusFilter" onchange="filterOrders()" class="action-filter">
-        <option value="">All Statuses</option>
-        <option value="PENDING">Pending</option>
-        <option value="RECEIVED">Received</option>
-        <option value="CANCELLED">Cancelled</option>
-    </select>
-    <button type="button" class="btn btn-secondary" style="margin-left:auto;" onclick="exportTableToExcel('ordersTable', 'orders.xlsx')">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export to Excel
-    </button>
+<h3 class="section-heading">Order Forms</h3>
+{% if batches %}
+<div class="table-wrap" style="margin-bottom:28px;">
+    <table id="batchTable" class="reports-table">
+        <thead>
+            <tr>
+                <th>Reference</th>
+                <th>Supplier</th>
+                <th class="num">Items</th>
+                <th class="num">Ordered</th>
+                <th class="num">Received</th>
+                <th class="num">Outstanding</th>
+                <th>Status</th>
+                <th>Placed</th>
+                <th class="no-export"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for batch in batches %}
+            <tr>
+                <td>{{ batch.reference or "Order #" ~ batch.id }}</td>
+                <td>{{ batch.supplier or "-" }}</td>
+                <td class="num">{{ batch.summary.lines }}</td>
+                <td class="num">{{ batch.summary.ordered }}</td>
+                <td class="num">{{ batch.summary.received }}</td>
+                <td class="num">{{ batch.summary.outstanding }}</td>
+                <td><span class="badge badge-{{ batch.status|lower }}">{{ batch.status|title }}</span></td>
+                <td>{{ batch.ordered_at_display }}</td>
+                <td><a href="{{ url_for('orders.order_batch_detail', batch_id=batch.id) }}" class="btn btn-secondary">Open</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
+{% else %}
+<div class="empty-state" style="margin-bottom:28px;">
+    <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+    No order forms yet.{% if can_order %} Start one above.{% endif %}
+</div>
+{% endif %}
 
+{% if standalone %}
+<h3 class="section-heading">Single-Item Orders</h3>
+<p class="page-subtitle" style="margin-bottom:12px;">Placed directly from an item rather than on a form.</p>
 <div class="table-wrap">
     <table id="ordersTable" class="reports-table">
         <thead>
             <tr>
                 <th>Item</th>
-                <th class="num">Quantity</th>
+                <th class="num">Ordered</th>
+                <th class="num">Received</th>
+                <th class="num">Outstanding</th>
                 <th>Status</th>
                 <th>Ordered By</th>
                 <th>Ordered At</th>
-                <th>Expected Date</th>
-                <th>Notes</th>
                 <th class="no-export"></th>
             </tr>
         </thead>
         <tbody>
-            {% for order in orders %}
-            <tr data-status="{{ order.status }}">
+            {% for order in standalone %}
+            <tr>
                 <td>{{ order.item_name }}</td>
                 <td class="num">{{ order.quantity }}</td>
+                <td class="num">{{ order.quantity_received or 0 }}</td>
+                <td class="num">{{ order.outstanding }}</td>
                 <td><span class="badge badge-{{ order.status|lower }}">{{ order.status|title }}</span></td>
                 <td>{{ order.ordered_by }}</td>
                 <td>{{ order.ordered_at_display }}</td>
-                <td>{{ order.expected_date_display or "-" }}</td>
-                <td>{{ order.notes or "-" }}</td>
                 <td>
-                    {% if order.status == "PENDING" %}
+                    {% if order.status in ["PENDING", "PARTIAL"] and can_order %}
                     <div style="display:flex; gap:6px;">
                         <form method="POST" action="{{ url_for('orders.receive_order', order_id=order.id) }}"
-                              onsubmit="return confirm('Mark this order received? {{ order.quantity }} will be added to &quot;{{ order.item_name }}&quot;.');">
+                              onsubmit="return confirm('Mark this order fully received? {{ order.outstanding }} will be added to &quot;{{ order.item_name }}&quot;.');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-secondary">Mark Received</button>
+                            <button type="submit" class="btn btn-secondary">Receive All</button>
                         </form>
                         <form method="POST" action="{{ url_for('orders.cancel_order', order_id=order.id) }}"
                               onsubmit="return confirm('Cancel this order?');">
@@ -69,109 +106,7 @@
             {% endfor %}
         </tbody>
     </table>
-    <p id="ordersNoResults" class="no-results" style="display:none;">No matching results.</p>
-    <div class="pagination-bar" id="ordersPaginationBar">
-        <span id="ordersPageSummary">Showing 0 of 0</span>
-        <div class="pagination-controls">
-            <label for="ordersPerPageSelect" style="margin-right:2px;">Rows per page:</label>
-            <select id="ordersPerPageSelect" class="per-page-select" onchange="changeOrdersPageSize(this.value)">
-                <option value="10">10</option>
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-            </select>
-            <button type="button" class="page-nav-btn" id="ordersPrevBtn" onclick="goToOrdersPage(-1)" title="Previous page">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <span class="page-indicator" id="ordersPageIndicator">Page 1 of 1</span>
-            <button type="button" class="page-nav-btn" id="ordersNextBtn" onclick="goToOrdersPage(1)" title="Next page">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
-        </div>
-    </div>
 </div>
-
-<script>
-let ordersCurrentPage = 1;
-let ordersPerPage = 25;
-
-function filterOrders()
-{
-    const searchInput = document.getElementById("ordersSearch").value.toLowerCase();
-    const statusInput = document.getElementById("ordersStatusFilter").value;
-    const rows = document.querySelectorAll("#ordersTable tbody tr");
-
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        const matchesSearch = text.includes(searchInput);
-        const matchesStatus = statusInput === "" || row.dataset.status === statusInput;
-        row.dataset.filterMatch = (matchesSearch && matchesStatus) ? "true" : "false";
-    });
-
-    ordersCurrentPage = 1;
-    renderOrdersPage();
-}
-
-function changeOrdersPageSize(value)
-{
-    ordersPerPage = parseInt(value, 10);
-    ordersCurrentPage = 1;
-    renderOrdersPage();
-}
-
-function goToOrdersPage(delta)
-{
-    ordersCurrentPage += delta;
-    renderOrdersPage();
-}
-
-function renderOrdersPage()
-{
-    const allRows = Array.from(document.querySelectorAll("#ordersTable tbody tr"));
-    const filteredRows = allRows.filter(row => row.dataset.filterMatch !== "false");
-    const totalFiltered = filteredRows.length;
-    const totalPages = Math.max(1, Math.ceil(totalFiltered / ordersPerPage));
-
-    if (ordersCurrentPage > totalPages) ordersCurrentPage = totalPages;
-    if (ordersCurrentPage < 1) ordersCurrentPage = 1;
-
-    const startIdx = (ordersCurrentPage - 1) * ordersPerPage;
-    const endIdx = startIdx + ordersPerPage;
-
-    allRows.forEach(row => {
-        if (row.dataset.filterMatch === "false") {
-            row.style.display = "none";
-            return;
-        }
-        const idxInFiltered = filteredRows.indexOf(row);
-        const onCurrentPage = idxInFiltered >= startIdx && idxInFiltered < endIdx;
-        row.style.display = onCurrentPage ? "" : "none";
-    });
-
-    document.getElementById("ordersNoResults").style.display = totalFiltered === 0 ? "block" : "none";
-    document.getElementById("ordersPaginationBar").style.display = totalFiltered === 0 ? "none" : "flex";
-
-    const rangeStart = totalFiltered === 0 ? 0 : startIdx + 1;
-    const rangeEnd = Math.min(endIdx, totalFiltered);
-    document.getElementById("ordersPageSummary").textContent =
-        `Showing ${rangeStart}-${rangeEnd} of ${totalFiltered}`;
-    document.getElementById("ordersPageIndicator").textContent =
-        `Page ${ordersCurrentPage} of ${totalPages}`;
-
-    document.getElementById("ordersPrevBtn").disabled = ordersCurrentPage <= 1;
-    document.getElementById("ordersNextBtn").disabled = ordersCurrentPage >= totalPages;
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll("#ordersTable tbody tr").forEach(row => {
-        row.dataset.filterMatch = "true";
-    });
-    renderOrdersPage();
-});
-</script>
-
-{% else %}
-<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>No orders yet. Place one from the Inventory or Low Stock pages.</div>
 {% endif %}
 
 {% endblock %}

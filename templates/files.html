@@ -33,6 +33,14 @@
                 </datalist>
             </div>
             <div class="field">
+                <label for="fileDocType">Document type</label>
+                <select id="fileDocType" name="doc_type">
+                    {% for value, label in doc_types %}
+                    <option value="{{ value }}" {{ 'selected' if value == 'OTHER' else '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
                 <label for="fileSubmissionFile">File</label>
                 <input type="file" id="fileSubmissionFile" name="file" required>
                 <span class="field-error" id="fileSubmissionFileError"></span>
@@ -65,7 +73,9 @@
         <thead>
             <tr>
                 <th>Name</th>
+                <th>Type</th>
                 <th>File</th>
+                <th>Related To</th>
                 <th>Category</th>
                 <th>Uploaded By</th>
                 <th>Uploaded At</th>
@@ -76,6 +86,7 @@
             {% for submission in submissions %}
             <tr data-category="{{ submission.category if submission.category else '__none__' }}">
                 <td>{{ submission.name }}</td>
+                <td>{{ submission.doc_type_display or "-" }}</td>
                 <td>
                     <span class="type-cell">
                         {% set ext = submission.original_filename.rsplit('.', 1)[-1]|lower if '.' in submission.original_filename else '' %}
@@ -92,6 +103,13 @@
                         {% endif %}
                         {{ submission.original_filename }}
                     </span>
+                </td>
+                <td>
+                    {% if submission.related_name %}
+                        {{ submission.related_kind }}: {{ submission.related_name }}
+                    {% elif submission.related_kind %}
+                        {{ submission.related_kind }} (deleted)
+                    {% else %}-{% endif %}
                 </td>
                 <td>{% if submission.category %}<span class="item-category cat-{{ submission.category|category_color }}">{{ submission.category }}</span>{% else %}-{% endif %}</td>
                 <td>{{ submission.uploaded_by }}</td>

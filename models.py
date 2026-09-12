@@ -53,18 +53,51 @@ class InventoryAudit(Base):
     )
 
 
-class InventoryOrder(Base):
-    __tablename__ = "inventory_order"
+class OrderBatch(Base):
+    """One order form - the paper document, which covers many items at once.
+
+    Added because the real workflow places and receives a whole form of
+    items together, while InventoryOrder is one row per item. A batch is
+    the header; its InventoryOrder rows are the line items.
+
+    Existing single-item orders predate this and keep batch_id = NULL;
+    they continue to work exactly as before, so nothing needed
+    backfilling."""
+    __tablename__ = "order_batch"
 
     id = Column(Integer, primary_key=True)
-    item_id = Column(Integer)            # references Inventory.id (no enforced FK,
-                                          # consistent with InventoryAudit.item_id)
-    quantity = Column(Integer)
-    status = Column(String, default="PENDING", index=True)  # PENDING, RECEIVED, CANCELLED
+    reference = Column(String, nullable=True, index=True)   # e.g. a PO number
+    supplier = Column(String, nullable=True)
+    status = Column(String, default="OPEN", index=True)     # OPEN, RECEIVED, CANCELLED
     ordered_by = Column(String)
     ordered_at = Column(DateTime, server_default=func.now(), index=True)
     expected_date = Column(Date, nullable=True)
     notes = Column(String, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+
+
+class InventoryOrder(Base):
+    """A single line on an order - one item and its quantity. Belongs to an
+    OrderBatch when placed via an order form; standalone (batch_id NULL)
+    when placed one-off from an item card."""
+    __tablename__ = "inventory_order"
+
+    id = Column(Integer, primary_key=True)
+    batch_id = Column(Integer, nullable=True, index=True)   # references OrderBatch.id
+    item_id = Column(Integer)            # references Inventory.id (no enforced FK,
+                                          # consistent with InventoryAudit.item_id)
+    quantity = Column(Integer)           # quantity ordered
+    # Cumulative quantity actually received. Split from `quantity` so a
+    # delivery that arrives short is recorded truthfully rather than being
+    # forced to either "all arrived" or "none arrived".
+    quantity_received = Column(Integer, default=0)
+    status = Column(String, default="PENDING", index=True)  # PENDING, PARTIAL, RECEIVED, CANCELLED
+    ordered_by = Column(String)
+    ordered_at = Column(DateTime, server_default=func.now(), index=True)
+    expected_date = Column(Date, nullable=True)
+    notes = Column(String, nullable=True)
+    condition_note = Column(String, nullable=True)   # damage / discrepancy on arrival
+    received_by = Column(String, nullable=True)
     received_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
@@ -82,8 +115,21 @@ class FileSubmission(Base):
     original_filename = Column(String)     # the actual filename that was uploaded
     blob_path = Column(String)             # where it lives in Azure Blob Storage
     category = Column(String, nullable=True)
+    # Operational document type, from a fixed list (see services/documents.py)
+    # rather than the previous free text, so "Invoice" and "invoice" can't
+    # drift into separate categories.
+    doc_type = Column(String, nullable=True, index=True)
+    # What this document pertains to. Together these link a packing slip to
+    # the order batch it arrived against, or a spec sheet to an item, so
+    # documents live with the operation instead of in a flat pile.
+    related_type = Column(String, nullable=True)   # ORDER_BATCH | INVENTORY_ITEM | None
+    related_id = Column(Integer, nullable=True)
     uploaded_by = Column(String)
     uploaded_at = Column(DateTime, server_default=func.now(), index=True)
+
+    __table_args__ = (
+        Index("ix_file_submission_related", "related_type", "related_id"),
+    )
 
 class HardwareItem(Base):
     """A single, individually-identified piece of equipment - one row per

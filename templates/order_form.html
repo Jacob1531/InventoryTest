@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('orders.inventory_orders') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Orders</a>
+
+<div class="page-header">
+    <div>
+        <h2>New Order Form</h2>
+        <p class="page-subtitle">One form, many items — matching how orders are placed on paper. Leave an item blank to skip it.</p>
+    </div>
+</div>
+
+<form id="orderFormForm" method="POST" action="{{ url_for('orders.create_order_batch') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p id="orderFormError" class="form-error-banner" style="display:none;"></p>
+
+    <div class="panel" style="margin-bottom:24px;">
+        <h2>Order Details</h2>
+        <p class="panel-subtitle">All optional — useful for matching this against a supplier's paperwork later.</p>
+        <div class="form-grid">
+            <div class="field">
+                <label for="ofReference">Reference / PO number</label>
+                <input type="text" id="ofReference" name="reference" placeholder="e.g. PO-2026-014">
+            </div>
+            <div class="field">
+                <label for="ofSupplier">Supplier</label>
+                <input type="text" id="ofSupplier" name="supplier" placeholder="e.g. Acme Supply Co.">
+            </div>
+            <div class="field">
+                <label for="ofExpected">Expected delivery</label>
+                <input type="date" id="ofExpected" name="expected_date">
+            </div>
+            <div class="field">
+                <label for="ofNotes">Notes</label>
+                <input type="text" id="ofNotes" name="notes" placeholder="Anything worth recording">
+            </div>
+        </div>
+    </div>
+
+    {% if items %}
+    <div class="filters">
+        <input type="text" id="orderItemSearch" class="search-box" placeholder="Search items..." onkeyup="filterOrderItems()">
+        <label class="inline-check">
+            <input type="checkbox" id="onlyLowStock" onchange="filterOrderItems()">
+            Only items below threshold
+        </label>
+        <span id="orderLineCount" class="chart-unit" style="margin-left:auto;">0 items selected</span>
+    </div>
+
+    <div class="table-wrap">
+        <table id="orderFormTable" class="reports-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th class="num">In Stock</th>
+                    <th class="num">Threshold</th>
+                    <th class="num" style="width:130px;">Order Qty</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr data-low="{{ 'yes' if item.suggested > 0 else 'no' }}">
+                    <td>{{ item.name }}</td>
+                    <td>
+                        {% if item.category %}
+                        <span class="item-category cat-{{ item.category|category_color }}">{{ item.category }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="num">{{ item.quantity }}</td>
+                    <td class="num">{{ item.low_stock_threshold if item.low_stock_threshold else "-" }}</td>
+                    <td class="num">
+                        <input type="number" min="0" class="order-qty" name="qty_{{ item.id }}"
+                               placeholder="0"
+                               {% if item.suggested > 0 %}data-suggested="{{ item.suggested }}"{% endif %}
+                               oninput="updateOrderLineCount()">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p id="orderFormNoResults" class="no-results" style="display:none;">No matching items.</p>
+    </div>
+
+    <div class="form-actions" style="margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="fillSuggested()">Fill suggested quantities</button>
+        <button type="submit" class="btn btn-primary" id="orderFormBtn">Place Order</button>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></div>
+        No active inventory items to order.
+    </div>
+    {% endif %}
+</form>
+
+<script>
+function filterOrderItems()
+{
+    const q = document.getElementById("orderItemSearch").value.toLowerCase();
+    const lowOnly = document.getElementById("onlyLowStock").checked;
+    const rows = document.querySelectorAll("#orderFormTable tbody tr");
+    let visible = 0;
+
+    rows.forEach(row => {
+        const input = row.querySelector(".order-qty");
+        // A row with a quantity typed into it always stays visible - hiding
+        // it would make the person think they'd lost their entry.
+        const hasValue = input && input.value.trim() !== "" && Number(input.value) > 0;
+        const matchesSearch = row.textContent.toLowerCase().includes(q);
+        const matchesLow = !lowOnly || row.dataset.low === "yes";
+        const show = hasValue || (matchesSearch && matchesLow);
+        row.style.display = show ? "" : "none";
+        if (show) visible++;
+    });
+
+    document.getElementById("orderFormNoResults").style.display = visible === 0 ? "block" : "none";
+}
+
+function fillSuggested()
+{
+    document.querySelectorAll(".order-qty").forEach(input => {
+        const s = input.dataset.suggested;
+        if (s && !input.value.trim()) input.value = s;
+    });
+    updateOrderLineCount();
+    filterOrderItems();
+}
+
+function updateOrderLineCount()
+{
+    const n = Array.from(document.querySelectorAll(".order-qty"))
+        .filter(i => i.value.trim() !== "" && Number(i.value) > 0).length;
+    document.getElementById("orderLineCount").textContent =
+        n + " item" + (n === 1 ? "" : "s") + " selected";
+    document.getElementById("orderFormBtn").disabled = n === 0;
+}
+
+document.getElementById("orderFormForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+    const banner = document.getElementById("orderFormError");
+    banner.style.display = "none";
+
+    const filled = Array.from(document.querySelectorAll(".order-qty"))
+        .filter(i => i.value.trim() !== "" && Number(i.value) > 0);
+    if (!filled.length) {
+        banner.textContent = "Add a quantity for at least one item.";
+        banner.style.display = "block";
+        return;
+    }
+    const bad = filled.find(i => !Number.isInteger(Number(i.value)) || Number(i.value) < 0);
+    if (bad) {
+        banner.textContent = "Quantities must be whole numbers.";
+        banner.style.display = "block";
+        bad.focus();
+        return;
+    }
+
+    const btn = document.getElementById("orderFormBtn");
+    btn.disabled = true;
+    btn.textContent = "Placing order...";
+
+    fetch(event.target.action, { method: "POST", body: new FormData(event.target) })
+        .then(res => res.text().then(text => ({ ok: res.ok, text, url: res.url })))
+        .then(({ ok, text, url }) => {
+            if (!ok) {
+                banner.textContent = cleanErrorText(text, "Failed to place order.");
+                banner.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = "Place Order";
+                return;
+            }
+            window.location.href = url;
+        })
+        .catch(() => {
+            banner.textContent = "Couldn't reach the server. Please try again.";
+            banner.style.display = "block";
+            btn.disabled = false;
+            btn.textContent = "Place Order";
+        });
+});
+
+document.addEventListener("DOMContentLoaded", updateOrderLineCount);
+</script>
+
+{% endblock %}

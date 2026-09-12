@@ -11,6 +11,7 @@ their location moved. Endpoint names are now namespaced as
 from services.inventory_update import update_inventory_quantity
 from services.notifications import send_low_stock_email
 from services.order_logic import compute_on_order_totals
+from services.receiving import OPEN_STATUSES
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from db import SessionLocal
 from models import Inventory, InventoryAudit, InventoryOrder, MAX_NUMERIC_VALUE
@@ -38,7 +39,7 @@ def low_stock_items():
         .all()
     )
 
-    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
+    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status.in_(OPEN_STATUSES)).all()
     on_order_totals = compute_on_order_totals(pending_orders)
 
     for item in items:
@@ -60,7 +61,7 @@ def inventory():
     items = db.query(Inventory).filter(Inventory.is_active == True).all()
 
     # Sum pending order quantity per item, so cards can show "X on order".
-    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
+    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status.in_(OPEN_STATUSES)).all()
     on_order_totals = compute_on_order_totals(pending_orders)
 
     for item in items:
@@ -286,7 +287,7 @@ def delete_inventory(item_id):
         # nobody can see or use anymore.
         db.query(InventoryOrder).filter(
             InventoryOrder.item_id == item.id,
-            InventoryOrder.status == "PENDING",
+            InventoryOrder.status.in_(OPEN_STATUSES),
         ).update({"status": "CANCELLED"}, synchronize_session=False)
 
         audit = InventoryAudit(

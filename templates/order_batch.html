@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block content %}
+
+<a href="{{ url_for('orders.inventory_orders') }}" class="back-link" style="margin-top:0; margin-bottom:16px;">← Back to Orders</a>
+
+<div class="page-header">
+    <div>
+        <h2>{{ batch.reference or "Order #" ~ batch.id }}</h2>
+        <p class="page-subtitle">
+            {% if batch.supplier %}{{ batch.supplier }} · {% endif %}
+            Placed {{ batch.ordered_at_display }} by {{ batch.ordered_by }}
+            {% if batch.expected_date_display %} · Expected {{ batch.expected_date_display }}{% endif %}
+        </p>
+    </div>
+    <div style="align-self:center;">
+        <span class="badge badge-{{ batch.status|lower }}">{{ batch.status|title }}</span>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ batch.summary.lines }}</div>
+        <div class="stat-label">Line Items</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ batch.summary.ordered }}</div>
+        <div class="stat-label">Units Ordered</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ batch.summary.received }}</div>
+        <div class="stat-label">Units Received</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value {{ 'stat-alert' if batch.summary.outstanding > 0 else '' }}">{{ batch.summary.outstanding }}</div>
+        <div class="stat-label">Still Outstanding</div>
+    </div>
+</div>
+
+{% if batch.notes %}
+<p class="page-subtitle" style="margin-bottom:20px;"><strong>Notes:</strong> {{ batch.notes }}</p>
+{% endif %}
+
+{% if has_open_lines and can_order %}
+<div class="panel" style="margin-bottom:28px;">
+    <h2>Record a Delivery</h2>
+    <p class="panel-subtitle">Enter what actually arrived. Leave a line blank if nothing came for it — short deliveries stay open for the remainder.</p>
+
+    <form id="receiveForm" method="POST" action="{{ url_for('orders.receive_batch', batch_id=batch.id) }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p id="receiveError" class="form-error-banner" style="display:none;"></p>
+
+        <div class="table-wrap" style="margin-bottom:18px;">
+            <table class="reports-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th class="num">Ordered</th>
+                        <th class="num">Already In</th>
+                        <th class="num">Outstanding</th>
+                        <th class="num" style="width:120px;">Arrived Now</th>
+                        <th style="width:200px;">Condition / notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in lines %}
+                    {% if line.status in ["PENDING", "PARTIAL"] %}
+                    <tr>
+                        <td>{{ line.item_name }}</td>
+                        <td class="num">{{ line.quantity }}</td>
+                        <td class="num">{{ line.quantity_received or 0 }}</td>
+                        <td class="num">{{ line.outstanding }}</td>
+                        <td class="num">
+                            <input type="number" min="0" class="recv-qty" name="recv_{{ line.id }}"
+                                   placeholder="0" data-outstanding="{{ line.outstanding }}"
+                                   oninput="updateReceiveCount()">
+                        </td>
+                        <td>
+                            <input type="text" name="cond_{{ line.id }}" placeholder="e.g. 2 damaged">
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-grid">
+            <div class="field">
+                <label for="recvBy">Received by</label>
+                <input type="text" id="recvBy" name="received_by" placeholder="{{ header_user }}">
+            </div>
+            <div class="field">
+                <label for="recvDocFile">Attach packing slip (optional)</label>
+                <input type="file" id="recvDocFile" name="document">
+                <span class="field-error" id="recvDocError"></span>
+            </div>
+            <div class="field">
+                <label for="recvDocType">Document type</label>
+                <select id="recvDocType" name="document_type">
+                    <option value="PACKING_SLIP">Packing slip</option>
+                    <option value="DELIVERY_NOTE">Delivery note</option>
+                    <option value="INVOICE">Invoice</option>
+                    <option value="DAMAGE_REPORT">Damage report</option>
+                    <option value="OTHER">Other</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="recvDocName">Document name</label>
+                <input type="text" id="recvDocName" name="document_name" placeholder="Defaults to the order reference">
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="fillAllOutstanding()">Everything arrived</button>
+            <button type="submit" class="btn btn-primary" id="receiveBtn">Record Delivery</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<h3 class="section-heading">Line Items</h3>
+<div class="table-wrap" style="margin-bottom:28px;">
+    <table class="reports-table">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th class="num">Ordered</th>
+                <th class="num">Received</th>
+                <th class="num">Outstanding</th>
+                <th>Status</th>
+                <th>Condition</th>
+                <th>Received By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in lines %}
+            <tr>
+                <td>{{ line.item_name }}</td>
+                <td class="num">{{ line.quantity }}</td>
+                <td class="num">{{ line.quantity_received or 0 }}</td>
+                <td class="num">{{ line.outstanding }}</td>
+                <td><span class="badge badge-{{ line.status|lower }}">{{ line.status|title }}</span></td>
+                <td>{{ line.condition_note or "-" }}</td>
+                <td>{{ line.received_by or "-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<h3 class="section-heading">Documents</h3>
+{% if documents %}
+<div class="table-wrap">
+    <table class="reports-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>File</th>
+                <th>Uploaded By</th>
+                <th>Uploaded At</th>
+                <th class="no-export"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in documents %}
+            <tr>
+                <td>{{ doc.name }}</td>
+                <td>{{ doc.doc_type_label or "-" }}</td>
+                <td>{{ doc.original_filename }}</td>
+                <td>{{ doc.uploaded_by }}</td>
+                <td>{{ doc.uploaded_at_display }}</td>
+                <td><a href="{{ doc.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+    No documents attached to this order yet.
+</div>
+{% endif %}
+
+<script>
+const MAX_RECV_DOC_BYTES = 25 * 1024 * 1024;
+
+function fillAllOutstanding()
+{
+    document.querySelectorAll(".recv-qty").forEach(i => { i.value = i.dataset.outstanding; });
+    updateReceiveCount();
+}
+
+function updateReceiveCount()
+{
+    const n = Array.from(document.querySelectorAll(".recv-qty"))
+        .filter(i => i.value.trim() !== "" && Number(i.value) > 0).length;
+    const btn = document.getElementById("receiveBtn");
+    if (btn) btn.disabled = n === 0;
+}
+
+const receiveForm = document.getElementById("receiveForm");
+if (receiveForm) {
+    document.getElementById("recvDocFile").addEventListener("change", function() {
+        const err = document.getElementById("recvDocError");
+        const f = this.files[0];
+        err.textContent = (f && f.size > MAX_RECV_DOC_BYTES)
+            ? "That file is too large. Maximum upload size is 25 MB." : "";
+        this.classList.toggle("has-error", !!err.textContent);
+    });
+
+    receiveForm.addEventListener("submit", function(event) {
+        event.preventDefault();
+        const banner = document.getElementById("receiveError");
+        banner.style.display = "none";
+
+        const filled = Array.from(document.querySelectorAll(".recv-qty"))
+            .filter(i => i.value.trim() !== "" && Number(i.value) > 0);
+        if (!filled.length) {
+            banner.textContent = "Enter a received quantity for at least one line.";
+            banner.style.display = "block";
+            return;
+        }
+        const bad = filled.find(i => !Number.isInteger(Number(i.value)) || Number(i.value) < 0);
+        if (bad) {
+            banner.textContent = "Received quantities must be whole numbers.";
+            banner.style.display = "block";
+            bad.focus();
+            return;
+        }
+        const docFile = document.getElementById("recvDocFile");
+        if (docFile.files.length && docFile.files[0].size > MAX_RECV_DOC_BYTES) {
+            banner.textContent = "That file is too large. Maximum upload size is 25 MB.";
+            banner.style.display = "block";
+            return;
+        }
+
+        const btn = document.getElementById("receiveBtn");
+        btn.disabled = true;
+        btn.textContent = "Recording...";
+
+        fetch(event.target.action, { method: "POST", body: new FormData(event.target) })
+            .then(res => res.text().then(text => ({ ok: res.ok, text })))
+            .then(({ ok, text }) => {
+                if (!ok) {
+                    banner.textContent = cleanErrorText(text, "Failed to record delivery.");
+                    banner.style.display = "block";
+                    btn.disabled = false;
+                    btn.textContent = "Record Delivery";
+                    return;
+                }
+                window.location.reload();
+            })
+            .catch(() => {
+                banner.textContent = "Couldn't reach the server. Please try again.";
+                banner.style.display = "block";
+                btn.disabled = false;
+                btn.textContent = "Record Delivery";
+            });
+    });
+
+    document.addEventListener("DOMContentLoaded", updateReceiveCount);
+}
+</script>
+
+{% endblock %}

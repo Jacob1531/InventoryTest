@@ -12,12 +12,13 @@ from flask import Blueprint, current_app, render_template
 from sqlalchemy import text
 from db import SessionLocal, engine
 from models import (DashboardPreference, FileSubmission, HardwareDocument, HardwareItem,
-                    HardwareNote, Inventory, InventoryAudit, InventoryOrder)
+                    HardwareNote, Inventory, InventoryAudit, InventoryOrder, OrderBatch)
 from services.chart_data import build_chart, DEFAULT_LIMIT, DEFAULT_MODE
 from permissions import is_basic_user
 from services.audit_helpers import (format_eastern, hidden_actions_for, resolve_item_name,
                                     week_ago_cutoff)
 from services.order_logic import compute_on_order_totals
+from services.receiving import OPEN_STATUSES
 from auth import get_user
 
 bp = Blueprint("main", __name__)
@@ -70,7 +71,7 @@ def dashboard():
     chart_category = pref.chart_category if pref else None
     chart_limit = pref.chart_limit if pref else DEFAULT_LIMIT
 
-    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status == "PENDING").all()
+    pending_orders = db.query(InventoryOrder).filter(InventoryOrder.status.in_(OPEN_STATUSES)).all()
     on_order_totals = compute_on_order_totals(pending_orders)
 
     chart = build_chart(
@@ -169,3 +170,36 @@ def add_hardware_site_column_once():
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_hardware_item_site ON hardware_item (site)"))
         conn.commit()
     return "site column added (or already existed) - remove this route now."
+
+
+# ONE-TIME MIGRATION - visit this URL once to create the order_batch table
+# and add the new columns behind multi-item order forms, partial receiving,
+# and document linking. Then DELETE THIS ROUTE.
+#
+# All of it is additive: existing single-item orders keep batch_id NULL and
+# behave exactly as before, and quantity_received defaults to 0 so their
+# outstanding amount is unchanged.
+@bp.route("/create-order-forms-once")
+def create_order_forms_once():
+    OrderBatch.__table__.create(bind=engine, checkfirst=True)
+    statements = [
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS batch_id INTEGER",
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS quantity_received INTEGER DEFAULT 0",
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS condition_note VARCHAR",
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS received_by VARCHAR",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_order_batch_id ON inventory_order (batch_id)",
+        # existing rows predate the column and would otherwise hold NULL,
+        # which breaks the outstanding-quantity arithmetic
+        "UPDATE inventory_order SET quantity_received = 0 WHERE quantity_received IS NULL",
+        "ALTER TABLE file_submission ADD COLUMN IF NOT EXISTS doc_type VARCHAR",
+        "ALTER TABLE file_submission ADD COLUMN IF NOT EXISTS related_type VARCHAR",
+        "ALTER TABLE file_submission ADD COLUMN IF NOT EXISTS related_id INTEGER",
+        "CREATE INDEX IF NOT EXISTS ix_file_submission_doc_type ON file_submission (doc_type)",
+        "CREATE INDEX IF NOT EXISTS ix_file_submission_related ON file_submission (related_type, related_id)",
+    ]
+    with engine.connect() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.commit()
+    return ("order_batch table created and order/file columns added "
+            "(or already existed) - remove this route now.")

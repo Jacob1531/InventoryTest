@@ -2021,3 +2021,51 @@ input[type="number"].has-error {
        while still reading as brand colour rather than a UI accent. */
     background: linear-gradient(90deg, #1890c0, #903090);
 }
+
+/* ==========================================================================
+   Order batches and receiving
+   ========================================================================== */
+.badge-open {
+    background-color: var(--info-bg);
+    color: var(--info);
+}
+
+.badge-partial {
+    background-color: #fffbeb;
+    color: #b45309;
+}
+
+[data-theme="dark"] .badge-partial {
+    background-color: rgba(245, 158, 11, 0.16);
+    color: #fbbf24;
+}
+
+.inline-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.inline-check input[type="checkbox"] {
+    width: auto;
+    height: auto;
+    margin: 0;
+    accent-color: var(--brand);
+}
+
+/* Quantity inputs inside table rows shouldn't inherit the full-width
+   form-field treatment - they sit in a narrow numeric column. */
+.reports-table input[type="number"],
+.reports-table input[type="text"] {
+    height: 32px;
+    padding: 5px 8px;
+    font-size: 13px;
+}
+
+.reports-table input[type="number"] {
+    text-align: right;
+}
