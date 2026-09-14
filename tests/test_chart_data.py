@@ -131,23 +131,27 @@ from services.chart_data import (
 
 
 class _FullItem:
-    def __init__(self, id, name, category, quantity, created_at=None):
+    def __init__(self, id, name, category, quantity, created_at=None,
+                 low_stock_threshold=None):
         self.id = id
         self.name = name
         self.category = category
         self.quantity = quantity
         self.created_at = created_at
+        self.low_stock_threshold = low_stock_threshold
 
 
 _NOW = datetime(2026, 1, 10)
 
 
 def _inventory():
+    """Thresholds chosen so the set exercises the real rule: Mop and
+    Diapers are genuinely below theirs, Bleach and Baby Wipes are not."""
     return [
-        _FullItem(1, "Baby Wipes", "Baby", 24, _NOW - timedelta(days=1)),
-        _FullItem(2, "Diapers", "Baby", 3, _NOW - timedelta(days=5)),
-        _FullItem(3, "Bleach", "Cleaning", 7, _NOW - timedelta(days=2)),
-        _FullItem(4, "Mop", "Cleaning", 0, _NOW - timedelta(days=30)),
+        _FullItem(1, "Baby Wipes", "Baby", 24, _NOW - timedelta(days=1), low_stock_threshold=10),
+        _FullItem(2, "Diapers", "Baby", 3, _NOW - timedelta(days=5), low_stock_threshold=12),
+        _FullItem(3, "Bleach", "Cleaning", 7, _NOW - timedelta(days=2), low_stock_threshold=5),
+        _FullItem(4, "Mop", "Cleaning", 0, _NOW - timedelta(days=30), low_stock_threshold=3),
     ]
 
 
@@ -171,21 +175,57 @@ def test_valid_limit_passes_through():
     assert normalize_limit("15") == 15
 
 
-def test_lowest_stock_sorts_ascending():
+def test_low_stock_only_includes_items_below_their_threshold():
+    """Not simply the smallest numbers: Bleach has 7 against a threshold
+    of 5, so it is NOT low despite being a small number."""
     rows = lowest_stock(_inventory(), limit=10)
-    assert [r["label"] for r in rows] == ["Mop", "Diapers", "Bleach", "Baby Wipes"]
+    assert [r["label"] for r in rows] == ["Mop", "Diapers"]
 
 
-def test_lowest_stock_zero_quantity_renders_empty_bar():
+def test_low_stock_includes_large_quantities_that_are_still_short():
+    """The case raw-quantity ranking got wrong: 40 in stock looks healthy
+    until you see the threshold is 60."""
+    items = [_FullItem(9, "Gloves", "Medical", 40, _NOW, low_stock_threshold=60)]
+    rows = lowest_stock(items, limit=10)
+    assert [r["label"] for r in rows] == ["Gloves"]
+
+
+def test_low_stock_excludes_items_at_or_above_threshold():
+    items = [
+        _FullItem(9, "Exactly at", "Misc", 5, _NOW, low_stock_threshold=5),
+        _FullItem(10, "Above", "Misc", 6, _NOW, low_stock_threshold=5),
+    ]
+    assert lowest_stock(items, limit=10) == []
+
+
+def test_low_stock_sorts_shortest_first():
+    rows = lowest_stock(_inventory(), limit=10)
+    counts = [r["count"] for r in rows]
+    assert counts == sorted(counts)
+
+
+def test_low_stock_zero_quantity_renders_empty_bar():
     rows = lowest_stock(_inventory(), limit=10)
     assert rows[0]["count"] == 0
     assert rows[0]["percent"] == 0
 
 
-def test_lowest_stock_ignores_items_with_no_quantity():
-    items = _inventory() + [_FullItem(9, "Unknown", "Misc", None)]
+def test_low_stock_ignores_items_with_no_quantity():
+    items = _inventory() + [_FullItem(9, "Unknown", "Misc", None, low_stock_threshold=5)]
     rows = lowest_stock(items, limit=10)
     assert "Unknown" not in [r["label"] for r in rows]
+
+
+def test_low_stock_excludes_items_with_no_threshold_set():
+    """With no threshold there's no basis to call an item low, so it's
+    excluded rather than guessed at."""
+    items = [_FullItem(9, "Unjudgeable", "Misc", 1, _NOW, low_stock_threshold=None)]
+    assert lowest_stock(items, limit=10) == []
+
+
+def test_low_stock_is_empty_when_nothing_is_low():
+    items = [_FullItem(9, "Plenty", "Misc", 100, _NOW, low_stock_threshold=5)]
+    assert lowest_stock(items, limit=10) == []
 
 
 def test_on_order_only_includes_items_with_pending_orders():
@@ -213,14 +253,15 @@ def test_recently_added_tolerates_missing_created_at():
 
 def test_build_chart_returns_title_and_value_label():
     chart = build_chart(_inventory(), mode=MODE_LOW_STOCK)
-    assert chart["title"] == "Lowest Stock"
+    assert chart["title"] == "Low Stock"
     assert chart["value_label"] == "Qty"
     assert chart["mode"] == MODE_LOW_STOCK
 
 
 def test_build_chart_category_filter_scopes_rows_and_title():
     chart = build_chart(_inventory(), mode=MODE_LOW_STOCK, category="Baby")
-    assert [r["label"] for r in chart["rows"]] == ["Diapers", "Baby Wipes"]
+    # Baby Wipes is above its threshold, so only Diapers qualifies
+    assert [r["label"] for r in chart["rows"]] == ["Diapers"]
     assert "Baby" in chart["title"]
 
 
@@ -254,4 +295,4 @@ def test_item_level_modes_colour_by_the_items_category():
     chart = build_chart(_inventory(), mode=MODE_LOW_STOCK)
     by_label = {r["label"]: r["color_key"] for r in chart["rows"]}
     assert by_label["Diapers"] == "Baby"
-    assert by_label["Bleach"] == "Cleaning"
+    assert by_label["Mop"] == "Cleaning"

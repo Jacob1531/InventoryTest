@@ -37,14 +37,14 @@ DEFAULT_LIMIT = 10
 # labels its value column rather than showing a bare ambiguous number.
 MODE_META = {
     MODE_CATEGORY:  {"title": "Inventory by Category", "value_label": "Items"},
-    MODE_LOW_STOCK: {"title": "Lowest Stock",          "value_label": "Qty"},
+    MODE_LOW_STOCK: {"title": "Low Stock",             "value_label": "Qty"},
     MODE_ON_ORDER:  {"title": "On Order",              "value_label": "Qty"},
     MODE_RECENT:    {"title": "Recently Added",        "value_label": "Qty"},
 }
 
 MODE_LABELS = {
     MODE_CATEGORY: "Inventory by category",
-    MODE_LOW_STOCK: "Lowest stock",
+    MODE_LOW_STOCK: "Low stock (below threshold)",
     MODE_ON_ORDER: "On order",
     MODE_RECENT: "Recently added",
 }
@@ -116,13 +116,25 @@ def category_breakdown(items, limit=DEFAULT_LIMIT):
 
 
 def lowest_stock(items, limit=DEFAULT_LIMIT):
-    """The items with the least stock on hand, lowest first - the most
-    actionable view. Bars are proportional to quantity, so a short bar
-    genuinely means low stock."""
-    ranked = sorted(
-        (i for i in items if i.quantity is not None),
-        key=lambda i: (i.quantity, (i.name or "").lower()),
-    )[:limit]
+    """Items that are actually BELOW their low-stock threshold, shortest
+    first.
+
+    Deliberately not "the items with the smallest numbers": an item with
+    3 left and a threshold of 2 is fine, while one with 40 left and a
+    threshold of 60 needs ordering. Ranking on raw quantity surfaced the
+    former and hid the latter.
+
+    Uses exactly the same rule as the Low Stock page - a threshold must
+    be set, and quantity must be under it - so the chart and that page
+    can never disagree about what counts as low. Items with no threshold
+    are excluded because there's no basis to judge them."""
+    low = [
+        i for i in items
+        if i.quantity is not None
+        and i.low_stock_threshold is not None
+        and i.quantity < i.low_stock_threshold
+    ]
+    ranked = sorted(low, key=lambda i: (i.quantity, (i.name or "").lower()))[:limit]
     return _with_percentages([(i.name, i.quantity, _item_category(i)) for i in ranked])
 
 
