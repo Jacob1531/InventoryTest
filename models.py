@@ -200,3 +200,24 @@ class DashboardPreference(Base):
     chart_category = Column(String, nullable=True)      # None = all categories
     chart_limit = Column(Integer, default=10)
     updated_at = Column(DateTime, onupdate=func.now(), server_default=func.now())
+
+
+class WarrantyNotification(Base):
+    """Records that a warranty alert was sent, so the daily job doesn't
+    repeat itself.
+
+    warranty_expires is part of the identity deliberately: an alert is
+    recorded against the expiry date it was sent FOR, so extending a
+    warranty leaves the old rows no longer matching and the milestones
+    re-arm on their own."""
+    __tablename__ = "warranty_notification"
+
+    id = Column(Integer, primary_key=True)
+    hardware_id = Column(Integer, index=True)
+    milestone = Column(String)              # DAY_60, DAY_30, EXPIRED
+    warranty_expires = Column(Date)
+    sent_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_warranty_notification_lookup", "hardware_id", "milestone", "warranty_expires"),
+    )

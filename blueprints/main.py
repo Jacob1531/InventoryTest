@@ -12,7 +12,8 @@ from flask import Blueprint, current_app, render_template
 from sqlalchemy import text
 from db import SessionLocal, engine
 from models import (DashboardPreference, FileSubmission, HardwareDocument, HardwareItem,
-                    HardwareNote, Inventory, InventoryAudit, InventoryOrder, OrderBatch)
+                    HardwareNote, Inventory, InventoryAudit, InventoryOrder, OrderBatch,
+                    WarrantyNotification)
 from services.chart_data import build_chart, DEFAULT_LIMIT, DEFAULT_MODE
 from permissions import is_basic_user
 from services.audit_helpers import (format_eastern, hidden_actions_for, resolve_item_name,
@@ -203,3 +204,11 @@ def create_order_forms_once():
         conn.commit()
     return ("order_batch table created and order/file columns added "
             "(or already existed) - remove this route now.")
+
+
+# ONE-TIME MIGRATION - visit this URL once to create the table that records
+# which warranty alerts have already been sent, then DELETE THIS ROUTE.
+@bp.route("/create-warranty-notifications-once")
+def create_warranty_notifications_once():
+    WarrantyNotification.__table__.create(bind=engine, checkfirst=True)
+    return "warranty_notification table created (or already existed) - remove this route now."

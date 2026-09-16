@@ -62,6 +62,9 @@ logger = logging.getLogger(__name__)
 
 # Configuration specific to the low-stock email feature.
 GROUP_ID = os.getenv("ENTRA_LOW_STOCK_GROUP_ID")
+# Admin group - receives hardware warranty expiry alerts. Separate from
+# the low-stock group so the two audiences can differ.
+ADMIN_GROUP_ID = os.getenv("ENTRA_ADMIN_GROUP_ID")
 SENDER_EMAIL = os.getenv("NOTIFICATION_SENDER_EMAIL")
 
 
@@ -157,3 +160,89 @@ def send_low_stock_email(item):
         "Low stock alert sent for '%s' to %d recipient(s)",
         item.name, len(recipient_emails),
     )
+
+
+def _format_warranty_item(item):
+    """One item's details as they appear in the alert email. Blank fields
+    are skipped rather than printed as 'None', so a sparsely filled record
+    still reads cleanly."""
+    lines = [f"  {item.name}"]
+
+    detail_fields = [
+        ("Type", getattr(item, "hardware_type", None)),
+        ("Manufacturer", getattr(item, "manufacturer", None)),
+        ("Model", getattr(item, "model", None)),
+        ("Serial", getattr(item, "serial_number", None)),
+        ("Site", getattr(item, "site", None)),
+        ("Location", getattr(item, "location", None)),
+        ("Assigned to", getattr(item, "assigned_to", None)),
+        ("Warranty provider", getattr(item, "warranty_provider", None)),
+    ]
+    for label, value in detail_fields:
+        if value:
+            lines.append(f"    {label}: {value}")
+
+    if item.warranty_expires:
+        lines.append(f"    Warranty expires: {item.warranty_expires.strftime('%Y-%m-%d')}")
+
+    return "\n".join(lines)
+
+
+def send_warranty_alert_email(milestone, items, subject, heading):
+    """Sends ONE email covering every item that hit `milestone` in this
+    run, rather than one email per item - a batch of ten expiring laptops
+    should be one message, not ten.
+
+    Goes to the ADMIN group (ENTRA_ADMIN_GROUP_ID), which is separate from
+    the low-stock recipients.
+    """
+    if not all([TENANT_ID, CLIENT_ID, KEY_VAULT_URL, CERT_NAME, ADMIN_GROUP_ID, SENDER_EMAIL]):
+        raise RuntimeError(
+            "Missing Entra/Graph/Key Vault configuration for warranty alerts "
+            "(check ENTRA_ADMIN_GROUP_ID is set)"
+        )
+    if not items:
+        return 0
+
+    token = get_graph_token()
+    recipient_emails = _get_group_member_emails(ADMIN_GROUP_ID, token)
+
+    if not recipient_emails:
+        logger.warning(
+            "No recipients found in admin group %s; skipping warranty alert",
+            ADMIN_GROUP_ID,
+        )
+        return 0
+
+    count = len(items)
+    body = (
+        f"{heading}\n\n"
+        f"{count} item{'s' if count != 1 else ''}:\n\n"
+        + "\n\n".join(_format_warranty_item(i) for i in items)
+        + "\n\nThis is an automated notification from the DCS Resource Hub."
+    )
+
+    message = {
+        "message": {
+            "subject": f"{subject} ({count})",
+            "body": {"contentType": "Text", "content": body},
+            "toRecipients": [{"emailAddress": {"address": SENDER_EMAIL}}],
+            "bccRecipients": [
+                {"emailAddress": {"address": e}} for e in recipient_emails
+            ],
+        },
+        "saveToSentItems": False,
+    }
+
+    url = f"{GRAPH_BASE}/users/{SENDER_EMAIL}/sendMail"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    resp = request_with_retry("POST", url, headers=headers, json=message)
+
+    if not resp.ok:
+        raise RuntimeError(f"Failed to send warranty alert: {resp.status_code} {resp.text}")
+
+    logger.info(
+        "Warranty alert (%s) sent for %d item(s) to %d recipient(s)",
+        milestone, count, len(recipient_emails),
+    )
+    return count

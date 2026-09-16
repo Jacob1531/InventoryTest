@@ -38,6 +38,7 @@ from blueprints.reports import bp as reports_bp
 from blueprints.files import bp as files_bp
 from blueprints.settings import bp as settings_bp
 from blueprints.hardware import bp as hardware_bp
+from blueprints.tasks import bp as tasks_bp
 
 app = Flask(__name__)
 
@@ -76,6 +77,13 @@ app.register_blueprint(reports_bp)
 app.register_blueprint(files_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(hardware_bp)
+app.register_blueprint(tasks_bp)
+
+# The scheduled-task routes are called by a machine, which has no session
+# and therefore no CSRF token. They're protected by their own shared-secret
+# header check instead (see blueprints/tasks.py) - CSRF defends against a
+# browser being tricked into posting, which doesn't apply to a scheduler.
+csrf.exempt(tasks_bp)
 
 
 @app.errorhandler(CSRFError)
