@@ -67,13 +67,30 @@ class OrderBatch(Base):
 
     id = Column(Integer, primary_key=True)
     reference = Column(String, nullable=True, index=True)   # e.g. a PO number
-    supplier = Column(String, nullable=True)
+    # Header fields matching the paper Supplies/Equipment/Furniture Order Form
+    program = Column(String, nullable=True, index=True)     # e.g. "Hamilton"
+    budget_line = Column(String, nullable=True)
+    supplier = Column(String, nullable=True)                # the form's VENDOR
+    needed_by = Column(Date, nullable=True)                 # the form's NEEDED BY
     status = Column(String, default="OPEN", index=True)     # OPEN, RECEIVED, CANCELLED
-    ordered_by = Column(String)
+    ordered_by = Column(String)                             # the form's PREPARED BY
     ordered_at = Column(DateTime, server_default=func.now(), index=True)
     expected_date = Column(Date, nullable=True)
     notes = Column(String, nullable=True)
     closed_at = Column(DateTime, nullable=True)
+
+    # The paper form's "Section For Office Use Only" - four dated milestones
+    # tracking a form from submission through to handing goods to the
+    # program. Stored as dates rather than a single status column because
+    # that is literally what the form records, and because the stage is
+    # derivable from which of them are filled in.
+    form_received_at = Column(DateTime, nullable=True)
+    order_placed_at = Column(DateTime, nullable=True)
+    order_received_at = Column(DateTime, nullable=True)
+    order_distributed_at = Column(DateTime, nullable=True)
+    form_received_by = Column(String, nullable=True)
+    order_placed_by = Column(String, nullable=True)
+    order_distributed_by = Column(String, nullable=True)
 
 
 class InventoryOrder(Base):
@@ -87,6 +104,12 @@ class InventoryOrder(Base):
     item_id = Column(Integer)            # references Inventory.id (no enforced FK,
                                           # consistent with InventoryAudit.item_id)
     quantity = Column(Integer)           # quantity ordered
+    # Line-level fields from the paper order form
+    vendor_item_number = Column(String, nullable=True)   # the form's "Item #"
+    color = Column(String, nullable=True)
+    unit_price = Column(Numeric, nullable=True)
+    # Captured when a delivery arrives, matching the Proof of Delivery form
+    delivery_person = Column(String, nullable=True)
     # Cumulative quantity actually received. Split from `quantity` so a
     # delivery that arrives short is recorded truthfully rather than being
     # forced to either "all arrived" or "none arrived".

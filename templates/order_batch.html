@@ -7,13 +7,15 @@
     <div>
         <h2>{{ batch.reference or "Order #" ~ batch.id }}</h2>
         <p class="page-subtitle">
+            {% if batch.program %}{{ batch.program }} · {% endif %}
             {% if batch.supplier %}{{ batch.supplier }} · {% endif %}
-            Placed {{ batch.ordered_at_display }} by {{ batch.ordered_by }}
-            {% if batch.expected_date_display %} · Expected {{ batch.expected_date_display }}{% endif %}
+            Prepared by {{ batch.ordered_by }} on {{ batch.ordered_at_display }}
+            {% if batch.needed_by_display %} · Needed by {{ batch.needed_by_display }}{% endif %}
+            {% if batch.budget_line %} · Budget line {{ batch.budget_line }}{% endif %}
         </p>
     </div>
     <div style="align-self:center;">
-        <span class="badge badge-{{ batch.status|lower }}">{{ batch.status|title }}</span>
+        <span class="badge badge-{{ stage_now|lower }}">{{ stage_labels[stage_now] }}</span>
     </div>
 </div>
 
@@ -35,6 +37,42 @@
         <div class="stat-label">Still Outstanding</div>
     </div>
 </div>
+
+<h3 class="section-heading">Order Progress</h3>
+<div class="stage-track">
+    {% for s in stages %}
+    <div class="stage-step {{ 'is-done' if s.done else '' }}">
+        <div class="stage-marker">
+            {% if s.done %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            {% endif %}
+        </div>
+        <div class="stage-body">
+            <div class="stage-label">{{ s.label }}</div>
+            {% if s.at_display %}
+            <div class="stage-date">{{ s.at_display }}</div>
+            {% elif s.can_mark and can_order %}
+            <form method="POST" action="{{ url_for('orders.advance_batch_stage', batch_id=batch.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="stage" value="{{ s.stage }}">
+                <button type="submit" class="btn btn-secondary stage-btn">Mark</button>
+            </form>
+            {% elif s.stage == "RECEIVED" %}
+            <div class="stage-date stage-pending">Set automatically when all items arrive</div>
+            {% else %}
+            <div class="stage-date stage-pending">Pending</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if order_total %}
+<p class="page-subtitle" style="margin-bottom:20px;">
+    <strong>Total:</strong> ${{ "%.2f"|format(order_total) }}{% if not all_priced %}
+    <span class="stage-pending">(some lines have no unit price)</span>{% endif %}
+</p>
+{% endif %}
 
 {% if batch.notes %}
 <p class="page-subtitle" style="margin-bottom:20px;"><strong>Notes:</strong> {{ batch.notes }}</p>
@@ -86,8 +124,16 @@
 
         <div class="form-grid">
             <div class="field">
-                <label for="recvBy">Received by</label>
+                <label for="recvDelivered">Delivery date and time</label>
+                <input type="datetime-local" id="recvDelivered" name="delivered_at">
+            </div>
+            <div class="field">
+                <label for="recvBy">Recipient's name</label>
                 <input type="text" id="recvBy" name="received_by" placeholder="{{ header_user }}">
+            </div>
+            <div class="field">
+                <label for="recvPerson">Delivery person's name</label>
+                <input type="text" id="recvPerson" name="delivery_person">
             </div>
             <div class="field">
                 <label for="recvDocFile">Attach packing slip (optional)</label>
@@ -123,8 +169,12 @@
     <table class="reports-table">
         <thead>
             <tr>
-                <th>Item</th>
+                <th>Supply Description</th>
+                <th>Item #</th>
+                <th>Color</th>
                 <th class="num">Ordered</th>
+                <th class="num">Unit Price</th>
+                <th class="num">Total</th>
                 <th class="num">Received</th>
                 <th class="num">Outstanding</th>
                 <th>Status</th>
@@ -136,7 +186,11 @@
             {% for line in lines %}
             <tr>
                 <td>{{ line.item_name }}</td>
+                <td>{{ line.vendor_item_number or "-" }}</td>
+                <td>{{ line.color or "-" }}</td>
                 <td class="num">{{ line.quantity }}</td>
+                <td class="num">{{ "%.2f"|format(line.unit_price) if line.unit_price is not none else "-" }}</td>
+                <td class="num">{{ "%.2f"|format(line.line_total) if line.line_total is not none else "-" }}</td>
                 <td class="num">{{ line.quantity_received or 0 }}</td>
                 <td class="num">{{ line.outstanding }}</td>
                 <td><span class="badge badge-{{ line.status|lower }}">{{ line.status|title }}</span></td>

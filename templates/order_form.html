@@ -16,25 +16,36 @@
 
     <div class="panel" style="margin-bottom:24px;">
         <h2>Order Details</h2>
-        <p class="panel-subtitle">All optional — useful for matching this against a supplier's paperwork later.</p>
+        <p class="panel-subtitle">Matches the header of the paper Supplies/Equipment/Furniture Order Form.</p>
         <div class="form-grid">
+            <div class="field">
+                <label for="ofProgram">Program</label>
+                <input type="text" id="ofProgram" name="program" placeholder="e.g. Hamilton">
+            </div>
+            <div class="field">
+                <label for="ofVendor">Vendor</label>
+                <input type="text" id="ofVendor" name="supplier" placeholder="e.g. Amazon">
+            </div>
+            <div class="field">
+                <label for="ofBudget">Budget line</label>
+                <input type="text" id="ofBudget" name="budget_line">
+            </div>
+            <div class="field">
+                <label for="ofNeeded">Needed by</label>
+                <input type="date" id="ofNeeded" name="needed_by">
+            </div>
             <div class="field">
                 <label for="ofReference">Reference / PO number</label>
                 <input type="text" id="ofReference" name="reference" placeholder="e.g. PO-2026-014">
-            </div>
-            <div class="field">
-                <label for="ofSupplier">Supplier</label>
-                <input type="text" id="ofSupplier" name="supplier" placeholder="e.g. Acme Supply Co.">
-            </div>
-            <div class="field">
-                <label for="ofExpected">Expected delivery</label>
-                <input type="date" id="ofExpected" name="expected_date">
             </div>
             <div class="field">
                 <label for="ofNotes">Notes</label>
                 <input type="text" id="ofNotes" name="notes" placeholder="Anything worth recording">
             </div>
         </div>
+        <p class="panel-subtitle" style="margin-top:14px;">
+            Prepared by <strong>{{ header_user }}</strong> &middot; recorded automatically.
+        </p>
     </div>
 
     {% if items %}
@@ -45,17 +56,21 @@
             Only items below threshold
         </label>
         <span id="orderLineCount" class="chart-unit" style="margin-left:auto;">0 items selected</span>
+        <span id="orderRunningTotal" class="chart-unit"></span>
     </div>
 
     <div class="table-wrap">
         <table id="orderFormTable" class="reports-table">
             <thead>
                 <tr>
-                    <th>Item</th>
+                    <th>Supply Description</th>
                     <th>Category</th>
                     <th class="num">In Stock</th>
                     <th class="num">Threshold</th>
-                    <th class="num" style="width:130px;">Order Qty</th>
+                    <th class="num" style="width:110px;">Quantity</th>
+                    <th style="width:120px;">Item #</th>
+                    <th style="width:100px;">Color</th>
+                    <th class="num" style="width:110px;">Unit Price</th>
                 </tr>
             </thead>
             <tbody>
@@ -73,6 +88,13 @@
                         <input type="number" min="0" class="order-qty" name="qty_{{ item.id }}"
                                placeholder="0"
                                {% if item.suggested > 0 %}data-suggested="{{ item.suggested }}"{% endif %}
+                               oninput="updateOrderLineCount()">
+                    </td>
+                    <td><input type="text" name="itemno_{{ item.id }}" placeholder="SKU"></td>
+                    <td><input type="text" name="color_{{ item.id }}" placeholder="-"></td>
+                    <td class="num">
+                        <input type="number" min="0" step="0.01" class="order-price"
+                               name="price_{{ item.id }}" placeholder="{{ '%.2f'|format(item.price) if item.price is not none else '0.00' }}"
                                oninput="updateOrderLineCount()">
                     </td>
                 </tr>
@@ -129,11 +151,26 @@ function fillSuggested()
 
 function updateOrderLineCount()
 {
-    const n = Array.from(document.querySelectorAll(".order-qty"))
-        .filter(i => i.value.trim() !== "" && Number(i.value) > 0).length;
+    const qtyInputs = Array.from(document.querySelectorAll(".order-qty"));
+    const filled = qtyInputs.filter(i => i.value.trim() !== "" && Number(i.value) > 0);
     document.getElementById("orderLineCount").textContent =
-        n + " item" + (n === 1 ? "" : "s") + " selected";
-    document.getElementById("orderFormBtn").disabled = n === 0;
+        filled.length + " item" + (filled.length === 1 ? "" : "s") + " selected";
+    document.getElementById("orderFormBtn").disabled = filled.length === 0;
+
+    // Running total across priced lines. Lines with no price are simply
+    // skipped - the total is shown as approximate in that case rather
+    // than silently treating them as free.
+    let total = 0, anyUnpriced = false;
+    filled.forEach(qtyInput => {
+        const row = qtyInput.closest("tr");
+        const priceInput = row.querySelector(".order-price");
+        const price = priceInput && priceInput.value.trim() !== "" ? Number(priceInput.value) : null;
+        if (price === null || Number.isNaN(price)) { anyUnpriced = true; return; }
+        total += price * Number(qtyInput.value);
+    });
+    const el = document.getElementById("orderRunningTotal");
+    el.textContent = filled.length === 0 ? ""
+        : (anyUnpriced ? "~" : "") + "$" + total.toFixed(2);
 }
 
 document.getElementById("orderFormForm").addEventListener("submit", function(event) {

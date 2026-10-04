@@ -20,6 +20,9 @@ from services.file_handler import (is_allowed_submission_filename, generate_file
                                    upload_submission_file)
 from services.receiving import (OPEN_STATUSES, apply_receipt, batch_status_from_lines,
                                 outstanding, summarize_batch)
+from services.order_lifecycle import (MANUAL_STAGES, STAGE_FIELDS, STAGE_LABELS,
+                                      can_advance_to, current_stage, line_total,
+                                      order_total, timeline)
 from auth import get_user
 from permissions import can_place_orders
 
@@ -146,15 +149,20 @@ def create_order_batch():
 
     reference = (request.form.get("reference") or "").strip() or None
     supplier = (request.form.get("supplier") or "").strip() or None
+    program = (request.form.get("program") or "").strip() or None
+    budget_line = (request.form.get("budget_line") or "").strip() or None
     notes = (request.form.get("notes") or "").strip() or None
 
-    expected_date = None
-    raw_date = (request.form.get("expected_date") or "").strip()
+    needed_by = None
+    raw_date = (request.form.get("needed_by") or "").strip()
     if raw_date:
         try:
-            expected_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
+            needed_by = datetime.strptime(raw_date, "%Y-%m-%d").date()
         except ValueError:
-            return "Expected date must be a valid date.", 400
+            return "Needed-by date must be a valid date.", 400
+    # Lines carry the same date, so a single-item view still shows when
+    # it's wanted without having to look up its batch.
+    expected_date = needed_by
 
     # Collect the lines the person actually filled in. Rows left blank or
     # set to zero are simply not ordered, rather than being an error - the
@@ -178,7 +186,27 @@ def create_order_batch():
             item_id = int(key[4:])
         except ValueError:
             continue
-        lines.append((item_id, qty))
+
+        # Optional per-line detail from the paper form.
+        raw_price = (request.form.get(f"price_{item_id}") or "").strip()
+        unit_price = None
+        if raw_price:
+            try:
+                unit_price = float(raw_price)
+            except ValueError:
+                return f"Unit price for item {item_id} must be a number.", 400
+            if unit_price < 0:
+                return "Unit price can't be negative.", 400
+            if unit_price > MAX_NUMERIC_VALUE:
+                return f"Unit price can't exceed {MAX_NUMERIC_VALUE}.", 400
+
+        lines.append({
+            "item_id": item_id,
+            "quantity": qty,
+            "unit_price": unit_price,
+            "vendor_item_number": (request.form.get(f"itemno_{item_id}") or "").strip() or None,
+            "color": (request.form.get(f"color_{item_id}") or "").strip() or None,
+        })
 
     if not lines:
         return "Add a quantity for at least one item.", 400
@@ -187,17 +215,20 @@ def create_order_batch():
     try:
         valid_ids = {
             i.id for i in db.query(Inventory).filter(
-                Inventory.id.in_([i for i, _ in lines]),
+                Inventory.id.in_([l["item_id"] for l in lines]),
                 Inventory.is_active == True,
             ).all()
         }
-        lines = [(i, q) for i, q in lines if i in valid_ids]
+        lines = [l for l in lines if l["item_id"] in valid_ids]
         if not lines:
             return "None of those items are available to order.", 400
 
         batch = OrderBatch(
             reference=reference,
+            program=program,
+            budget_line=budget_line,
             supplier=supplier,
+            needed_by=needed_by,
             status="OPEN",
             ordered_by=get_user(),
             expected_date=expected_date,
@@ -206,11 +237,14 @@ def create_order_batch():
         db.add(batch)
         db.flush()  # need batch.id before the lines can reference it
 
-        for item_id, qty in lines:
+        for line in lines:
             db.add(InventoryOrder(
                 batch_id=batch.id,
-                item_id=item_id,
-                quantity=qty,
+                item_id=line["item_id"],
+                quantity=line["quantity"],
+                unit_price=line["unit_price"],
+                vendor_item_number=line["vendor_item_number"],
+                color=line["color"],
                 quantity_received=0,
                 status="PENDING",
                 ordered_by=get_user(),
@@ -260,10 +294,21 @@ def order_batch_detail(batch_id):
         doc.file_url = generate_file_url(doc.blob_path)
         doc.doc_type_label = doc_type_label(doc.doc_type)
 
+    for line in lines:
+        line.line_total = line_total(line)
+
     batch.summary = summarize_batch(lines)
     batch.ordered_at_display = format_eastern(batch.ordered_at, fmt="%Y-%m-%d %I:%M %p %Z")
     batch.expected_date_display = batch.expected_date.strftime("%Y-%m-%d") if batch.expected_date else None
+    batch.needed_by_display = batch.needed_by.strftime("%Y-%m-%d") if batch.needed_by else None
     has_open_lines = any(l.status in OPEN_STATUSES for l in lines)
+    all_received = bool(lines) and not has_open_lines
+
+    stages = timeline(batch)
+    for stage in stages:
+        stage["at_display"] = format_eastern(stage["at"], fmt="%Y-%m-%d %I:%M %p %Z") if stage["at"] else None
+        stage["can_mark"] = can_advance_to(batch, stage["stage"], all_received)
+    total, all_priced = order_total(lines)
 
     db.close()
     return render_template(
@@ -272,9 +317,62 @@ def order_batch_detail(batch_id):
         lines=lines,
         documents=documents,
         has_open_lines=has_open_lines,
+        stages=stages,
+        stage_now=current_stage(batch),
+        stage_labels=STAGE_LABELS,
+        order_total=total,
+        all_priced=all_priced,
         can_order=can_place_orders(),
         title=batch.reference or f"Order #{batch.id}",
     )
+
+
+@bp.route("/inventory/orders/batch/<int:batch_id>/stage", methods=["POST"])
+def advance_batch_stage(batch_id):
+    """Marks one of the paper form's 'Office Use Only' milestones.
+
+    Only the manual ones are reachable here - 'order received' is set by
+    the receiving flow when the last line actually arrives, so it can
+    never be claimed for goods that haven't turned up."""
+    if not can_place_orders():
+        return "You don't have permission to update orders.", 403
+
+    stage = (request.form.get("stage") or "").strip()
+    if stage not in MANUAL_STAGES:
+        return "That stage can't be set by hand.", 400
+
+    db = SessionLocal()
+    try:
+        batch = db.query(OrderBatch).filter(OrderBatch.id == batch_id).first()
+        if not batch:
+            return "Order not found", 404
+
+        lines = db.query(InventoryOrder).filter(InventoryOrder.batch_id == batch_id).all()
+        all_received = bool(lines) and not any(l.status in OPEN_STATUSES for l in lines)
+
+        if not can_advance_to(batch, stage, all_received):
+            return f"{STAGE_LABELS[stage]} can't be marked right now.", 400
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        setattr(batch, STAGE_FIELDS[stage], now)
+
+        # Record who marked it, where the form has a signature line.
+        by_field = {
+            "FORM_RECEIVED": "form_received_by",
+            "PLACED": "order_placed_by",
+            "DISTRIBUTED": "order_distributed_by",
+        }.get(stage)
+        if by_field:
+            setattr(batch, by_field, get_user())
+
+        db.commit()
+        flash(f"Marked: {STAGE_LABELS[stage]}.", "success")
+        return redirect(url_for("orders.order_batch_detail", batch_id=batch_id))
+    except Exception as e:
+        db.rollback()
+        return f"Failed to update order: {str(e)}", 500
+    finally:
+        db.close()
 
 
 @bp.route("/inventory/orders/batch/<int:batch_id>/receive", methods=["POST"])
@@ -286,6 +384,17 @@ def receive_batch(batch_id):
         return "You don't have permission to receive orders.", 403
 
     received_by = (request.form.get("received_by") or "").strip() or get_user()
+    delivery_person = (request.form.get("delivery_person") or "").strip() or None
+
+    # The Proof of Delivery form records when the delivery actually
+    # arrived, which may not be when someone gets round to entering it.
+    delivered_at = None
+    raw_delivered = (request.form.get("delivered_at") or "").strip()
+    if raw_delivered:
+        try:
+            delivered_at = datetime.strptime(raw_delivered, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            return "Delivery date and time must be valid.", 400
 
     doc_file = request.files.get("document")
     has_doc = bool(doc_file and doc_file.filename)
@@ -326,6 +435,7 @@ def receive_batch(batch_id):
             return "Enter a received quantity for at least one line.", 400
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
+        receipt_time = delivered_at or now
         for line, new_total, new_status, added in planned:
             item = db.query(Inventory).filter(Inventory.id == line.item_id).first()
             if not item:
@@ -337,7 +447,8 @@ def receive_batch(batch_id):
             line.quantity_received = new_total
             line.status = new_status
             line.received_by = received_by
-            line.received_at = now
+            line.delivery_person = delivery_person
+            line.received_at = receipt_time
             condition = (request.form.get(f"cond_{line.id}") or "").strip()
             if condition:
                 line.condition_note = condition
@@ -355,6 +466,11 @@ def receive_batch(batch_id):
         # Refresh the batch header from its lines' new states.
         batch.status = batch_status_from_lines(lines)
         batch.closed_at = now if batch.status != "OPEN" else None
+
+        # "Order received" is derived, never marked by hand - it lands
+        # exactly when the last outstanding line does.
+        if batch.status == "RECEIVED" and not batch.order_received_at:
+            batch.order_received_at = now
 
         if has_doc:
             blob_path = upload_submission_file(doc_file, prefix="files")
