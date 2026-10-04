@@ -8,7 +8,6 @@ their location moved. Endpoint names are now namespaced as
 "inventory.<function_name>" for url_for().
 =====================================================================
 """
-from services.inventory_update import update_inventory_quantity
 from services.notifications import send_low_stock_email
 from services.order_logic import compute_on_order_totals
 from services.receiving import OPEN_STATUSES
@@ -80,26 +79,33 @@ def inventory():
     )
 
 
-@bp.route("/inventory/update", methods=["POST"])
-def update_inventory():
-    id = request.form["id"]
-
-    try:
-        new_qty = int(request.form["quantity"])
-    except (KeyError, ValueError, TypeError):
-        return "Invalid numeric input", 400
-
-    if new_qty < 0:
-        return "Quantity can't be negative", 400
-    if abs(new_qty) > MAX_NUMERIC_VALUE:
-        return f"Quantity can't exceed {MAX_NUMERIC_VALUE}", 400
-
-    try:
-        update_inventory_quantity(id, new_qty)
-    except ValueError as e:
-        return str(e), 404
-
-    return redirect(url_for("inventory.inventory"))
+# DISABLED - leftover groundwork for a bulk quantity-update feature that
+# was never built. Nothing in the UI posts here, and unlike every other
+# write route it carried no permission check, so any signed-in user could
+# have changed quantities through it directly. Commented out rather than
+# deleted in case the bulk-update idea is revived; if so, add a
+# permission gate before re-enabling.
+#
+# @bp.route("/inventory/update", methods=["POST"])
+# def update_inventory():
+#     id = request.form["id"]
+#
+#     try:
+#         new_qty = int(request.form["quantity"])
+#     except (KeyError, ValueError, TypeError):
+#         return "Invalid numeric input", 400
+#
+#     if new_qty < 0:
+#         return "Quantity can't be negative", 400
+#     if abs(new_qty) > MAX_NUMERIC_VALUE:
+#         return f"Quantity can't exceed {MAX_NUMERIC_VALUE}", 400
+#
+#     try:
+#         update_inventory_quantity(id, new_qty)
+#     except ValueError as e:
+#         return str(e), 404
+#
+#     return redirect(url_for("inventory.inventory"))
 
 
 @bp.route("/inventory/edit/<int:item_id>", methods=["POST"])

@@ -51,7 +51,7 @@
                 <td class="num">{{ item.on_order if item.on_order else "-" }}</td>
                 {% if can_order %}
                 <td>
-                    <button type="button" class="btn btn-secondary" data-id="{{ item.id }}" data-name="{{ item.name }}" onclick="openOrderModal(this)">Place Order</button>
+                    <a href="{{ url_for('orders.new_order_form', item=item.id) }}" class="btn btn-secondary">Add to Order</a>
                 </td>
                 {% endif %}
             </tr>

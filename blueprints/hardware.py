@@ -7,7 +7,7 @@ Each row is one individually-identified device (a specific printer,
 not "3 printers"), with attached documents (receipts, manuals,
 warranty paperwork) and a running history of timestamped notes.
 
-The whole section is gated by @require_elevated_access - members of
+The whole section is gated by @require_admin - members of
 the basic-permissions group can neither see the dashboard card nor
 reach these URLs directly.
 =====================================================================
@@ -24,7 +24,7 @@ from services.file_handler import (upload_submission_file, generate_file_url,
 from services.hardware_logic import (warranty_status, days_until_expiry,
                                      summarize_warranties, STATUS_LABELS)
 from auth import get_user
-from permissions import require_elevated_access
+from permissions import require_admin
 
 bp = Blueprint("hardware", __name__)
 
@@ -107,7 +107,7 @@ def _read_item_form(form):
 
 
 @bp.route("/hardware-warranty")
-@require_elevated_access
+@require_admin
 def hardware_warranty():
     db = SessionLocal()
     items = (
@@ -140,7 +140,7 @@ def hardware_warranty():
 
 
 @bp.route("/hardware-warranty/add", methods=["POST"])
-@require_elevated_access
+@require_admin
 def add_hardware():
     values, error = _read_item_form(request.form)
     if error:
@@ -190,7 +190,7 @@ def add_hardware():
 
 
 @bp.route("/hardware-warranty/<int:item_id>")
-@require_elevated_access
+@require_admin
 def hardware_detail(item_id):
     db = SessionLocal()
     item = (
@@ -239,7 +239,7 @@ def hardware_detail(item_id):
 
 
 @bp.route("/hardware-warranty/<int:item_id>/edit", methods=["POST"])
-@require_elevated_access
+@require_admin
 def edit_hardware(item_id):
     values, error = _read_item_form(request.form)
     if error:
@@ -265,7 +265,7 @@ def edit_hardware(item_id):
 
 
 @bp.route("/hardware-warranty/<int:item_id>/delete", methods=["POST"])
-@require_elevated_access
+@require_admin
 def delete_hardware(item_id):
     """Soft delete, matching Inventory's pattern - the row and its
     documents/notes are kept, just hidden from the list."""
@@ -289,7 +289,7 @@ def delete_hardware(item_id):
 
 
 @bp.route("/hardware-warranty/<int:item_id>/documents", methods=["POST"])
-@require_elevated_access
+@require_admin
 def add_hardware_document(item_id):
     name = request.form.get("name", "").strip()
     doc_type = request.form.get("doc_type", "").strip() or None
@@ -330,7 +330,7 @@ def add_hardware_document(item_id):
 
 
 @bp.route("/hardware-warranty/documents/<int:doc_id>/delete", methods=["POST"])
-@require_elevated_access
+@require_admin
 def delete_hardware_document(doc_id):
     db = SessionLocal()
     try:
@@ -356,7 +356,7 @@ def delete_hardware_document(doc_id):
 
 
 @bp.route("/hardware-warranty/<int:item_id>/notes", methods=["POST"])
-@require_elevated_access
+@require_admin
 def add_hardware_note(item_id):
     note_text = request.form.get("note", "").strip()
     if not note_text:
@@ -385,7 +385,7 @@ def add_hardware_note(item_id):
 
 
 @bp.route("/hardware-warranty/notes/<int:note_id>/delete", methods=["POST"])
-@require_elevated_access
+@require_admin
 def delete_hardware_note(note_id):
     db = SessionLocal()
     try:

@@ -29,58 +29,6 @@ from permissions import can_place_orders
 bp = Blueprint("orders", __name__)
 
 
-@bp.route("/inventory/order/<int:item_id>", methods=["POST"])
-def place_order(item_id):
-    if not can_place_orders():
-        return "You don't have permission to place orders.", 403
-
-    db = SessionLocal()
-    try:
-        item = db.query(Inventory).filter(Inventory.id == item_id, Inventory.is_active == True).first()
-        if not item:
-            return "Item not found", 404
-
-        try:
-            quantity = int(request.form.get("quantity"))
-        except (TypeError, ValueError):
-            return "Quantity must be a whole number.", 400
-
-        if quantity <= 0:
-            return "Order quantity must be greater than zero.", 400
-        if quantity > MAX_NUMERIC_VALUE:
-            return f"Order quantity can't exceed {MAX_NUMERIC_VALUE}.", 400
-
-        expected_date_str = request.form.get("expected_date")
-        expected_date = None
-        if expected_date_str:
-            try:
-                expected_date = datetime.strptime(expected_date_str, "%Y-%m-%d").date()
-            except ValueError:
-                return "Expected date must be a valid date.", 400
-
-        notes = request.form.get("notes") or None
-
-        order = InventoryOrder(
-            item_id=item.id,
-            quantity=quantity,
-            status="PENDING",
-            ordered_by=get_user(),
-            expected_date=expected_date,
-            notes=notes,
-        )
-        db.add(order)
-        db.commit()
-
-        flash(f'Order placed: {quantity} x "{item.name}".', "success")
-        return redirect(request.referrer or url_for("inventory.inventory"))
-
-    except Exception as e:
-        db.rollback()
-        return f"Failed to place order: {str(e)}", 500
-    finally:
-        db.close()
-
-
 @bp.route("/inventory/orders")
 def inventory_orders():
     db = SessionLocal()
@@ -125,6 +73,10 @@ def new_order_form():
     if not can_place_orders():
         return "You don't have permission to place orders.", 403
 
+    # Arriving from an item's order button pre-fills that one line, so the
+    # one-item case stays quick while still going through the same form.
+    preselect_id = request.args.get("item", type=int)
+
     db = SessionLocal()
     items = (
         db.query(Inventory)
@@ -132,14 +84,30 @@ def new_order_form():
         .order_by(Inventory.name.asc())
         .all()
     )
-    # Suggested quantity: enough to reach the low-stock threshold again.
+    preselect_name = None
     for item in items:
+        # Suggested quantity: enough to reach the low-stock threshold again.
         if item.low_stock_threshold and (item.quantity or 0) < item.low_stock_threshold:
             item.suggested = item.low_stock_threshold - (item.quantity or 0)
         else:
             item.suggested = 0
+
+        item.preselected = (item.id == preselect_id)
+        if item.preselected:
+            preselect_name = item.name
+            # A healthy item has no shortfall to suggest, so default to 1
+            # rather than leaving the field they came here to fill blank.
+            item.prefill = item.suggested or 1
+        else:
+            item.prefill = None
+
     db.close()
-    return render_template("order_form.html", items=items, title="New Order Form")
+    return render_template(
+        "order_form.html",
+        items=items,
+        preselect_name=preselect_name,
+        title="New Order Form",
+    )
 
 
 @bp.route("/inventory/orders/new", methods=["POST"])

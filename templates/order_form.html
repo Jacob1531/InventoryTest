@@ -6,7 +6,13 @@
 <div class="page-header">
     <div>
         <h2>New Order Form</h2>
-        <p class="page-subtitle">One form, many items — matching how orders are placed on paper. Leave an item blank to skip it.</p>
+        <p class="page-subtitle">
+            {% if preselect_name %}
+            Started from <strong>{{ preselect_name }}</strong> — add any other items you need before placing the order.
+            {% else %}
+            One form, many items — matching how orders are placed on paper. Leave an item blank to skip it.
+            {% endif %}
+        </p>
     </div>
 </div>
 
@@ -75,7 +81,7 @@
             </thead>
             <tbody>
                 {% for item in items %}
-                <tr data-low="{{ 'yes' if item.suggested > 0 else 'no' }}">
+                <tr data-low="{{ 'yes' if item.suggested > 0 else 'no' }}"{% if item.preselected %} class="is-preselected" id="preselectedRow"{% endif %}>
                     <td>{{ item.name }}</td>
                     <td>
                         {% if item.category %}
@@ -87,6 +93,7 @@
                     <td class="num">
                         <input type="number" min="0" class="order-qty" name="qty_{{ item.id }}"
                                placeholder="0"
+                               {% if item.prefill %}value="{{ item.prefill }}"{% endif %}
                                {% if item.suggested > 0 %}data-suggested="{{ item.suggested }}"{% endif %}
                                oninput="updateOrderLineCount()">
                     </td>
@@ -217,7 +224,17 @@ document.getElementById("orderFormForm").addEventListener("submit", function(eve
         });
 });
 
-document.addEventListener("DOMContentLoaded", updateOrderLineCount);
+document.addEventListener("DOMContentLoaded", () => {
+    updateOrderLineCount();
+    // Bring the row they arrived for into view - with 90 items it could
+    // otherwise be far down the page.
+    const row = document.getElementById("preselectedRow");
+    if (row) {
+        row.scrollIntoView({ block: "center" });
+        const input = row.querySelector(".order-qty");
+        if (input) { input.focus(); input.select(); }
+    }
+});
 </script>
 
 {% endblock %}

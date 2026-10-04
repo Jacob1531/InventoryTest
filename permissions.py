@@ -1,105 +1,113 @@
 """
 permissions.py
 =====================================================================
-Shared permission checks used across blueprints. Extracted from app.py
-during the blueprint refactor so that any blueprint can import them
-without importing the Flask app object itself (which would create a
-circular import: app -> blueprints -> app).
+Access tiers and the checks built on them. Extracted from app.py so
+any blueprint can import these without importing the Flask app itself
+(which would be a circular import).
 
-All checks FAIL CLOSED - any error determining group membership is
-treated as "denied" rather than "allowed". See the individual
-docstrings for the reasoning.
+    ADMIN    everything, including Hardware & Warranty
+    MANAGER  everything except Hardware (the low-stock group)
+    BASIC    view/add/edit inventory, imports, reports, own files only
+    NONE     blocked from the app entirely
+
+DEGRADING ON ERROR
+------------------
+If Graph can't be reached, the tier falls back to BASIC - NOT to NONE.
+That is a deliberate availability choice: NONE blocks the whole app, so
+treating an outage as NONE would mean a Graph hiccup takes the entire
+system down for everyone. BASIC still denies every elevated action, so
+the failure stays restrictive without being total.
+
+NONE is reserved for a definite answer from Graph that the user is in
+none of the groups.
 =====================================================================
 """
 from functools import wraps
 
-from flask import render_template
+from flask import g, render_template
 
 from auth import get_user_id
-from services.group_access import is_basic_permissions_user, GroupCheckError
+from services.group_access import (GroupCheckError, TIER_ADMIN, TIER_BASIC, TIER_MANAGER,
+                                   TIER_NONE, get_user_tier)
+
+# Tiers allowed to do the things that used to be "not basic".
+ELEVATED_TIERS = (TIER_ADMIN, TIER_MANAGER)
+
+
+def current_tier():
+    """The signed-in user's tier, resolved once per request.
+
+    Memoised on flask.g because the nav, the page body and any route
+    guard may all ask during a single request, and each miss would be
+    another Graph round-trip."""
+    if not hasattr(g, "_access_tier"):
+        try:
+            g._access_tier = get_user_tier(get_user_id())
+        except GroupCheckError as e:
+            # See the module docstring: degrade to BASIC, never to NONE.
+            print(f"Tier check failed, degrading to BASIC: {e}")
+            g._access_tier = TIER_BASIC
+    return g._access_tier
+
+
+def is_admin():
+    return current_tier() == TIER_ADMIN
+
+
+def is_elevated():
+    """Manager or Admin - i.e. everything except Hardware is permitted."""
+    return current_tier() in ELEVATED_TIERS
+
+
+def has_any_access():
+    return current_tier() != TIER_NONE
+
+
+def is_basic_user():
+    """True for the BASIC tier. Kept for the places that RESTRICT rather
+    than permit (own-files-only, hiding PURGE from history), where the
+    positive phrasing reads better than `not is_elevated()`."""
+    return current_tier() == TIER_BASIC
+
+
+def can_place_orders():
+    """Placing, receiving and progressing orders: Manager and Admin."""
+    return is_elevated()
+
+
+def can_delete_files():
+    """Deleting file submissions: Manager and Admin. Uploading and
+    viewing stay open to Basic."""
+    return is_elevated()
+
+
+def can_view_hardware_warranty():
+    """Hardware & Warranty is ADMIN ONLY - the one thing Manager
+    deliberately doesn't get."""
+    return is_admin()
 
 
 def require_elevated_access(view_func):
-    """Blocks members of the "basic permissions" Entra ID group from an
-    entire section - both the page itself and its sub-routes. Currently
-    used by Database Settings (and its threshold/purge sub-routes) and
-    Hardware & Warranty. Fails CLOSED: if membership can't be reliably
-    determined - missing config, Graph error, no user ID - access is
-    denied rather than silently allowed. That's a deliberate choice: the
-    failure mode of "the restricted group gets in anyway" is worse than
-    "everyone is temporarily blocked until the check works again"."""
+    """Blocks Basic users from a whole section - the page and its
+    sub-routes. Used by Database Settings."""
     @wraps(view_func)
     def wrapped(*args, **kwargs):
-        try:
-            is_basic_permissions = is_basic_permissions_user(get_user_id())
-        except GroupCheckError as e:
-            print(f"Elevated-access check failed for {view_func.__name__}, denying access: {e}")
-            return render_template("access_denied.html", reason="check_failed", title="Access Denied"), 403
-
-        if is_basic_permissions:
-            return render_template("access_denied.html", reason="restricted_group", title="Access Denied"), 403
-
+        if not is_elevated():
+            return render_template(
+                "access_denied.html", reason="restricted_group", title="Access Denied"
+            ), 403
         return view_func(*args, **kwargs)
     return wrapped
 
 
-def can_place_orders():
-    """True if the signed-in user is allowed to place orders - i.e. NOT a
-    member of the basic-permissions group. Unlike Database Settings, this
-    doesn't block viewing anything, only the ability to create a new
-    order; Orders, Inventory, and Low Stock stay fully viewable either
-    way. Fails CLOSED, same reasoning as Database Settings: any error
-    checking membership is treated as 'cannot place orders'."""
-    try:
-        return not is_basic_permissions_user(get_user_id())
-    except GroupCheckError as e:
-        print(f"Order-placement permission check failed, denying: {e}")
-        return False
-
-
-def can_delete_files():
-    """True if the signed-in user is allowed to delete file submissions -
-    i.e. NOT a member of the basic-permissions group. Uploading and
-    viewing Files stay open to everyone; only the destructive delete
-    action is gated. Fails CLOSED, same reasoning as the other
-    permission checks."""
-    try:
-        return not is_basic_permissions_user(get_user_id())
-    except GroupCheckError as e:
-        print(f"File-deletion permission check failed, denying: {e}")
-        return False
-
-
-def can_view_hardware_warranty():
-    """True if the signed-in user is allowed to see the Hardware &
-    Warranty dashboard card at all - i.e. NOT a member of the
-    basic-permissions group. Unlike can_place_orders/can_delete_files
-    (which gate one action within an otherwise-visible section), this
-    controls whether the card renders at all - matching Database
-    Settings' pattern where restricted users can't view the section,
-    not just act within it. The actual page itself is separately
-    enforced by @require_elevated_access, so this check existing only
-    controls the dashboard card's visibility, not real access."""
-    try:
-        return not is_basic_permissions_user(get_user_id())
-    except GroupCheckError as e:
-        print(f"Hardware & Warranty visibility check failed, denying: {e}")
-        return False
-
-
-def is_basic_user():
-    """True if the signed-in user is in the basic-permissions group.
-
-    The inverse of the can_* helpers above, provided separately so callers
-    that RESTRICT rather than PERMIT read naturally (no double negatives).
-
-    Fails closed in the restrictive direction: if membership can't be
-    determined, the user is treated AS basic, so they see less rather than
-    more. Note this is the opposite boolean from can_place_orders() and
-    friends, but the same underlying principle - an error should never
-    grant visibility."""
-    try:
-        return is_basic_permissions_user(get_user_id())
-    except GroupCheckError as e:
-        print(f"Basic-user check failed, treating as basic (showing less): {e}")
-        return True
+def require_admin(view_func):
+    """Admin only. Used by Hardware & Warranty, which Manager is
+    deliberately excluded from."""
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        if not is_admin():
+            return render_template(
+                "access_denied.html", reason="admin_only", title="Access Denied"
+            ), 403
+        return view_func(*args, **kwargs)
+    return wrapped

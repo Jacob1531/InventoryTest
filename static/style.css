@@ -2158,3 +2158,13 @@ input[type="number"].has-error {
 .badge-form_received  { background-color: var(--info-bg); color: var(--info); }
 .badge-placed         { background-color: var(--info-bg); color: var(--info); }
 .badge-distributed    { background-color: var(--success-bg); color: var(--success); }
+
+/* Row the user arrived at from an item's order button - highlighted so it
+   stands out among 90 rows they didn't come for. */
+.is-preselected td {
+    background: var(--brand-soft);
+}
+
+.is-preselected td:first-child {
+    box-shadow: inset 3px 0 0 var(--brand);
+}

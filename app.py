@@ -23,12 +23,12 @@ The URLs themselves are unchanged.
 """
 import os
 
-from flask import Flask, g, request
+from flask import Flask, g, render_template, request
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 from auth import get_user
 from services.category_colors import category_color
-from permissions import can_view_hardware_warranty
+from permissions import can_view_hardware_warranty, current_tier, has_any_access, is_admin
 
 from blueprints.main import bp as main_bp
 from blueprints.inventory import bp as inventory_bp
@@ -86,6 +86,31 @@ app.register_blueprint(tasks_bp)
 csrf.exempt(tasks_bp)
 
 
+# Blueprints that must NOT be gated by the tier check.
+#   tasks  - called by the scheduler, which has no signed-in user at all;
+#            it carries its own shared-secret guard instead.
+GATE_EXEMPT_BLUEPRINTS = {"tasks"}
+
+
+@app.before_request
+def block_users_with_no_access():
+    """Users in none of the access groups are blocked from the whole app.
+
+    Returning the notice here rather than per-route means a new route can
+    never accidentally be left ungated.
+    """
+    if request.blueprint in GATE_EXEMPT_BLUEPRINTS:
+        return None
+    # Static files are served before any identity exists, and blocking
+    # them would strip the styling from the notice page itself.
+    if request.endpoint == "static":
+        return None
+
+    if not has_any_access():
+        return render_template("no_access.html", title="No Access"), 403
+    return None
+
+
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
     # Flask-WTF's default is a full HTML error page. Every form in this app
@@ -126,17 +151,9 @@ NAV_ITEMS = [
 
 
 def _nav_can_see_hardware():
-    """Memoised per request via flask.g. The nav renders on every page, and
-    several places may ask the same question during one request - this
-    keeps it to at most one Graph call per request rather than per lookup.
-
-    Note this does mean one membership check per page load. If that ever
-    feels slow, caching the result in the session (with the user id stored
-    alongside it, so a shared browser can't inherit someone else's answer)
-    is the next step."""
-    if not hasattr(g, "_nav_hardware_ok"):
-        g._nav_hardware_ok = can_view_hardware_warranty()
-    return g._nav_hardware_ok
+    """Hardware is admin-only. permissions.current_tier() is already
+    memoised per request, so this costs nothing extra."""
+    return is_admin()
 
 
 @app.context_processor

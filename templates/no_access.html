@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>No Access · DCS Resource Hub</title>
+    <script>
+        (function () {
+            if (localStorage.getItem("theme") === "dark") {
+                document.documentElement.setAttribute("data-theme", "dark");
+            }
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}">
+</head>
+<body>
+
+{#
+   Deliberately standalone rather than extending base.html: this page is
+   shown to people with no access at all, so it must not render the nav,
+   the account chip, or anything else implying they're inside the app.
+#}
+<div class="app-chrome">
+    <header class="top-bar">
+        <span class="brand">
+            <img src="{{ url_for('static', filename='diaspora_logo.png') }}" alt="" class="brand-logo">
+            <span class="brand-divider"></span>
+        </span>
+        <span class="brand-text">
+            <span class="brand-name">DCS Resource Hub</span>
+            <span class="brand-tagline">Inventory &amp; Operations</span>
+        </span>
+        <span></span>
+    </header>
+    <div class="brand-strip" aria-hidden="true"></div>
+</div>
+
+<main class="content">
+    <div class="access-denied-panel" style="margin-top:48px;">
+        <div class="access-denied-icon">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>You don't have permission to access this site</h3>
+        <p>
+            Your account isn't assigned to any access group for the Resource Hub.
+            If you believe this is a mistake, please notify your supervisor so they
+            can arrange access.
+        </p>
+        {% if header_user and header_user != "unknown" %}
+        <p style="margin-top:14px; font-size:12.5px; color:var(--text-faint);">
+            Signed in as {{ header_user }}
+        </p>
+        {% endif %}
+    </div>
+</main>
+
+</body>
+</html>

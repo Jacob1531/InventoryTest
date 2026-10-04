@@ -16,25 +16,20 @@ from services.audit_helpers import (format_audit_value, format_eastern, hidden_a
                                     resolve_item_name)
 from services.chart_data import (DEFAULT_LIMIT, DEFAULT_MODE, MODE_LABELS, VALID_LIMITS,
                                  normalize_limit, normalize_mode)
-from services.group_access import GroupCheckError, is_basic_permissions_user
 from auth import get_user, get_user_id
-from permissions import is_basic_user, require_elevated_access
+from permissions import is_basic_user, is_elevated, require_elevated_access
 
 bp = Blueprint("settings", __name__)
 
 
 @bp.route("/settings")
 def settings():
-    try:
-        db_settings_restricted = is_basic_permissions_user(get_user_id())
-    except GroupCheckError as e:
-        print(f"Database Settings access check failed on Settings page, showing as restricted: {e}")
-        db_settings_restricted = True
-
+    # The tier is already resolved (and memoised) for this request by the
+    # access gate, so this costs no extra Graph call.
     return render_template(
         "settings.html",
         title="Settings",
-        db_settings_restricted=db_settings_restricted,
+        db_settings_restricted=not is_elevated(),
     )
 
 
