@@ -465,6 +465,12 @@ def receive_batch(batch_id):
 
 @bp.route("/inventory/order/<int:order_id>/receive", methods=["POST"])
 def receive_order(order_id):
+    # Same gate as receive_batch. The UI hides this button from Basic
+    # users, but hiding a button is not access control - the endpoint
+    # adds stock to inventory, so it has to check for itself.
+    if not can_place_orders():
+        return "You don't have permission to receive orders.", 403
+
     db = SessionLocal()
     try:
         order = db.query(InventoryOrder).filter(InventoryOrder.id == order_id).first()
@@ -517,6 +523,9 @@ def receive_order(order_id):
 
 @bp.route("/inventory/order/<int:order_id>/cancel", methods=["POST"])
 def cancel_order(order_id):
+    if not can_place_orders():
+        return "You don't have permission to cancel orders.", 403
+
     db = SessionLocal()
     try:
         order = db.query(InventoryOrder).filter(InventoryOrder.id == order_id).first()
