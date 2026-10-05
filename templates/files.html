@@ -55,6 +55,12 @@
 {% if submissions %}
 <div class="filters">
     <input type="text" id="filesSearch" placeholder="Search by name, uploader..." onkeyup="filterFiles()" class="search-box">
+    <select id="filesTypeFilter" onchange="filterFiles()" class="action-filter">
+        <option value="">All Types</option>
+        {% for value, label in doc_types %}
+        {% if value in doc_types_present %}<option value="{{ value }}">{{ label }}</option>{% endif %}
+        {% endfor %}
+    </select>
     <select id="filesCategoryFilter" onchange="filterFiles()" class="action-filter">
         <option value="">All Categories</option>
         {% for cat in categories %}
@@ -84,7 +90,7 @@
         </thead>
         <tbody>
             {% for submission in submissions %}
-            <tr data-category="{{ submission.category if submission.category else '__none__' }}">
+            <tr data-category="{{ submission.category if submission.category else '__none__' }}" data-doctype="{{ submission.doc_type or '' }}">
                 <td>{{ submission.name }}</td>
                 <td>{{ submission.doc_type_display or "-" }}</td>
                 <td>
@@ -160,13 +166,15 @@ function filterFiles()
 {
     const query = document.getElementById("filesSearch").value.toLowerCase();
     const categoryInput = document.getElementById("filesCategoryFilter").value;
+    const typeInput = document.getElementById("filesTypeFilter").value;
     const rows = document.querySelectorAll("#filesTable tbody tr");
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const matchesSearch = text.includes(query);
         const matchesCategory = categoryInput === "" || row.dataset.category === categoryInput;
-        row.dataset.filterMatch = (matchesSearch && matchesCategory) ? "true" : "false";
+        const matchesType = typeInput === "" || row.dataset.doctype === typeInput;
+        row.dataset.filterMatch = (matchesSearch && matchesCategory && matchesType) ? "true" : "false";
     });
 
     filesCurrentPage = 1;
