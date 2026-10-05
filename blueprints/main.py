@@ -224,27 +224,27 @@ def favicon():
 # # # fields, line fields, and the four "Office Use Only" lifecycle dates.
 # # # Then DELETE THIS ROUTE. All additive - existing orders keep NULLs and
 # # # behave exactly as before.
-# @bp.route("/add-order-form-fields-once")
-# def add_order_form_fields_once():
-#     statements = [
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS program VARCHAR",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS budget_line VARCHAR",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS needed_by DATE",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS form_received_at TIMESTAMP",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_placed_at TIMESTAMP",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_received_at TIMESTAMP",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_distributed_at TIMESTAMP",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS form_received_by VARCHAR",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_placed_by VARCHAR",
-#         "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_distributed_by VARCHAR",
-#         "CREATE INDEX IF NOT EXISTS ix_order_batch_program ON order_batch (program)",
-#         "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS vendor_item_number VARCHAR",
-#         "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS color VARCHAR",
-#         "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS unit_price NUMERIC",
-#         "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS delivery_person VARCHAR",
-#     ]
-#     with engine.connect() as conn:
-#         for stmt in statements:
-#             conn.execute(text(stmt))
-#         conn.commit()
-#     return f"Added {len(statements)} order-form columns (or they already existed) - remove this route now."
+@bp.route("/add-order-form-fields-once")
+def add_order_form_fields_once():
+    statements = [
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS program VARCHAR",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS budget_line VARCHAR",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS needed_by DATE",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS form_received_at TIMESTAMP",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_placed_at TIMESTAMP",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_received_at TIMESTAMP",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_distributed_at TIMESTAMP",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS form_received_by VARCHAR",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_placed_by VARCHAR",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS order_distributed_by VARCHAR",
+        "CREATE INDEX IF NOT EXISTS ix_order_batch_program ON order_batch (program)",
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS vendor_item_number VARCHAR",
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS color VARCHAR",
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS unit_price NUMERIC",
+        "ALTER TABLE inventory_order ADD COLUMN IF NOT EXISTS delivery_person VARCHAR",
+    ]
+    with engine.connect() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.commit()
+    return f"Added {len(statements)} order-form columns (or they already existed) - remove this route now."
