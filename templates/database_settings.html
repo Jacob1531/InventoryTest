@@ -10,8 +10,22 @@
     </div>
 </div>
 
-<div class="inventory-toolbar">
-    <span></span>
+<div class="filters">
+    <input type="text" id="thresholdSearch" class="search-box" placeholder="Search items..." onkeyup="filterThresholds()">
+    <select id="thresholdStateFilter" class="action-filter" onchange="filterThresholds()">
+        <option value="">All items</option>
+        <option value="unset">No threshold set</option>
+        <option value="set">Threshold set</option>
+        <option value="low">Currently below threshold</option>
+    </select>
+    <select id="thresholdSort" class="action-filter" onchange="sortThresholds()">
+        <option value="name">Sort: Name (A–Z)</option>
+        <option value="name_desc">Sort: Name (Z–A)</option>
+        <option value="qty">Sort: Quantity (low to high)</option>
+        <option value="qty_desc">Sort: Quantity (high to low)</option>
+        <option value="threshold">Sort: Threshold (low to high)</option>
+    </select>
+    <span id="thresholdCount" class="chart-unit" style="margin-left:auto;"></span>
     <button type="button" class="btn btn-secondary" onclick="exportTableToExcel('thresholdsTable', 'low-stock-thresholds.xlsx')">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export to Excel
@@ -30,8 +44,16 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr>
-                <td>{{ item.name }}</td>
+            {% set has_threshold = item.low_stock_threshold is not none %}
+            {% set is_low = has_threshold and item.quantity is not none and item.quantity < item.low_stock_threshold %}
+            <tr data-name="{{ item.name|lower }}"
+                data-qty="{{ item.quantity if item.quantity is not none else 0 }}"
+                data-threshold="{{ item.low_stock_threshold if has_threshold else -1 }}"
+                data-state="{{ 'low' if is_low else ('set' if has_threshold else 'unset') }}">
+                <td>
+                    {{ item.name }}
+                    {% if is_low %}<span class="badge badge-low" style="margin-left:7px;">Low</span>{% endif %}
+                </td>
                 <td class="num">{{ item.quantity }}</td>
                 <td>
                     <form method="POST" action="{{ url_for('settings.update_threshold', item_id=item.id) }}" style="display:flex; gap:8px; align-items:center;">
@@ -99,5 +121,56 @@
 {% else %}
 <div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>No inactive items right now.</div>
 {% endif %}
+
+
+<script>
+function filterThresholds()
+{
+    const q = document.getElementById("thresholdSearch").value.toLowerCase().trim();
+    const state = document.getElementById("thresholdStateFilter").value;
+    const rows = document.querySelectorAll("#thresholdsTable tbody tr");
+    let shown = 0;
+
+    rows.forEach(row => {
+        const matchesSearch = !q || row.dataset.name.includes(q);
+        // "low" is a subset of "set", so a row below its threshold still
+        // shows under "Threshold set" as well.
+        let matchesState = true;
+        if (state === "unset")      matchesState = row.dataset.state === "unset";
+        else if (state === "set")   matchesState = row.dataset.state !== "unset";
+        else if (state === "low")   matchesState = row.dataset.state === "low";
+
+        const show = matchesSearch && matchesState;
+        row.style.display = show ? "" : "none";
+        if (show) shown++;
+    });
+
+    const total = rows.length;
+    document.getElementById("thresholdCount").textContent =
+        shown === total ? `${total} items` : `${shown} of ${total}`;
+}
+
+function sortThresholds()
+{
+    const mode = document.getElementById("thresholdSort").value;
+    const tbody = document.querySelector("#thresholdsTable tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+
+    const num = (row, key) => Number(row.dataset[key]);
+    const cmp = {
+        name:          (a, b) => a.dataset.name.localeCompare(b.dataset.name),
+        name_desc:     (a, b) => b.dataset.name.localeCompare(a.dataset.name),
+        qty:           (a, b) => num(a, "qty") - num(b, "qty"),
+        qty_desc:      (a, b) => num(b, "qty") - num(a, "qty"),
+        // unset thresholds are stored as -1 so they group together at the
+        // top, which is where you want them when filling these in
+        threshold:     (a, b) => num(a, "threshold") - num(b, "threshold"),
+    }[mode];
+
+    rows.sort(cmp).forEach(row => tbody.appendChild(row));
+}
+
+document.addEventListener("DOMContentLoaded", filterThresholds);
+</script>
 
 {% endblock %}

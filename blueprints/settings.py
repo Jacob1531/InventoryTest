@@ -26,18 +26,25 @@ bp = Blueprint("settings", __name__)
 def settings():
     # The tier is already resolved (and memoised) for this request by the
     # access gate, so this costs no extra Graph call.
-    return render_template(
-        "settings.html",
-        title="Settings",
-        db_settings_restricted=not is_elevated(),
-    )
+    if not is_elevated():
+        # Account Settings is the only thing a Basic user can do here, so
+        # showing them a hub with one locked card is just an extra click
+        # advertising something they can't use.
+        return redirect(url_for("settings.account_settings"))
+
+    return render_template("settings.html", title="Settings")
 
 
 @bp.route("/settings/database")
 @require_elevated_access
 def database_settings():
     db = SessionLocal()
-    items = db.query(Inventory).filter(Inventory.is_active == True).all()
+    items = (
+        db.query(Inventory)
+        .filter(Inventory.is_active == True)
+        .order_by(Inventory.name.asc())
+        .all()
+    )
     inactive_items = (
         db.query(Inventory)
         .filter(Inventory.is_active == False)
