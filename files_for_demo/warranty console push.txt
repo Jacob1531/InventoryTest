@@ -1,0 +1,6 @@
+in dev debug console. First do allow paste
+
+fetch('/tasks/warranty-alerts', {
+  method: 'POST',
+  headers: { 'X-Task-Token': 'gsZOrIiW0m3rMXHATPeOuzjmOdPCQh3q' }
+}).then(r => r.json()).then(console.log)
