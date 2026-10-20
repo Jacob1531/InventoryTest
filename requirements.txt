@@ -4,7 +4,6 @@ gunicorn
 sqlalchemy
 psycopg2-binary
 azure-storage-blob
-pandas
 openpyxl
 msal
 requests

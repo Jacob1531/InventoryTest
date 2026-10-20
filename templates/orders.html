@@ -90,12 +90,12 @@
                     {% if order.status in ["PENDING", "PARTIAL"] and can_order %}
                     <div style="display:flex; gap:6px;">
                         <form method="POST" action="{{ url_for('orders.receive_order', order_id=order.id) }}"
-                              onsubmit="return confirm('Mark this order fully received? {{ order.outstanding }} will be added to &quot;{{ order.item_name }}&quot;.');">
+                              data-confirm="Mark this order fully received? {{ order.outstanding }} will be added to &quot;{{ order.item_name }}&quot;." onsubmit="return confirm(this.dataset.confirm);">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-secondary">Receive All</button>
                         </form>
                         <form method="POST" action="{{ url_for('orders.cancel_order', order_id=order.id) }}"
-                              onsubmit="return confirm('Cancel this order?');">
+                              data-confirm="Cancel this order?" onsubmit="return confirm(this.dataset.confirm);">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger-outline">Cancel</button>
                         </form>

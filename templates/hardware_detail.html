@@ -14,7 +14,7 @@
     <div style="align-self:center; display:flex; gap:8px; align-items:center;">
         <span class="badge badge-warranty-{{ item.warranty_state|lower }}">{{ item.warranty_label }}</span>
         <form method="POST" action="{{ url_for('hardware.delete_hardware', item_id=item.id) }}"
-              onsubmit="return confirm('Delete &quot;{{ item.name }}&quot;? Its documents and notes are kept but the item is removed from the list.');">
+              data-confirm="Delete &quot;{{ item.name }}&quot;? Its documents and notes are kept but the item is removed from the list." onsubmit="return confirm(this.dataset.confirm);">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-danger-outline">Delete Item</button>
         </form>
@@ -163,7 +163,7 @@
                         <div style="display:flex; gap:6px;">
                             <a href="{{ doc.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a>
                             <form method="POST" action="{{ url_for('hardware.delete_hardware_document', doc_id=doc.id) }}"
-                                  onsubmit="return confirm('Remove &quot;{{ doc.name }}&quot;? This cannot be undone.');">
+                                  data-confirm="Remove &quot;{{ doc.name }}&quot;? This cannot be undone." onsubmit="return confirm(this.dataset.confirm);">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-danger-outline">Remove</button>
                             </form>
@@ -205,7 +205,7 @@
                 <div class="note-meta">{{ note.created_by }} · {{ note.created_at_display }}</div>
             </div>
             <form method="POST" action="{{ url_for('hardware.delete_hardware_note', note_id=note.id) }}"
-                  onsubmit="return confirm('Delete this note?');">
+                  data-confirm="Delete this note?" onsubmit="return confirm(this.dataset.confirm);">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="icon-btn delete-btn" title="Delete note">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>

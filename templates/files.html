@@ -125,7 +125,7 @@
                         <a href="{{ submission.file_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Download</a>
                         {% if can_delete %}
                         <form method="POST" action="{{ url_for('files.delete_file_submission', submission_id=submission.id) }}"
-                              onsubmit="return confirm('Delete &quot;{{ submission.name }}&quot;? This cannot be undone.');">
+                              data-confirm="Delete &quot;{{ submission.name }}&quot;? This cannot be undone." onsubmit="return confirm(this.dataset.confirm);">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger-outline">Delete</button>
                         </form>
