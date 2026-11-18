@@ -9,13 +9,16 @@ their location moved. Endpoint names are now namespaced as
 =====================================================================
 """
 import os
-from flask import Blueprint, flash, redirect, render_template, request, send_from_directory, url_for
+from datetime import datetime, timezone
+from flask import (Blueprint, Response, flash, redirect, render_template, request,
+                   send_from_directory, url_for)
 from db import SessionLocal
-from models import DashboardPreference, Inventory, InventoryAudit
+from models import DashboardPreference, Inventory, InventoryAudit, UserSignature
 from services.audit_helpers import (format_audit_value, format_eastern, hidden_actions_for,
                                     resolve_item_name)
 from services.chart_data import (DEFAULT_LIMIT, DEFAULT_MODE, MODE_LABELS, VALID_LIMITS,
                                  normalize_limit, normalize_mode)
+from services.signatures import SignatureError, decode_signature
 from auth import get_user, get_user_id
 from permissions import is_basic_user, is_elevated, require_elevated_access
 
@@ -190,10 +193,19 @@ def account_settings():
         for item in db.query(Inventory).filter(Inventory.is_active == True).all()
     })
 
+    signature = _active_signature(db, get_user_id())
+    signature_saved_display = (
+        format_eastern(signature.created_at, fmt="%Y-%m-%d %I:%M %p %Z") if signature else None
+    )
+
     db.close()
 
     return render_template(
         "account_settings.html",
+        has_signature=signature is not None,
+        signature_saved_display=signature_saved_display,
+        signature_version=signature.id if signature else 0,
+        can_sign=bool(get_user_id()),
         current_user=current_user,
         my_logs=my_logs,
         chart_pref=chart_pref,
@@ -247,5 +259,107 @@ def save_dashboard_chart_preference():
     except Exception as e:
         db.rollback()
         return f"Failed to save chart settings: {str(e)}", 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------
+# E-signature
+# ---------------------------------------------------------------------
+
+def _active_signature(db, user_oid):
+    if not user_oid:
+        return None
+    return (
+        db.query(UserSignature)
+        .filter(UserSignature.user_oid == user_oid, UserSignature.is_active == True)
+        .order_by(UserSignature.id.desc())
+        .first()
+    )
+
+
+@bp.route("/settings/account/signature.png")
+def my_signature_image():
+    """Serves the signed-in user's own current signature. There's
+    deliberately no way to ask for someone else's here - a user ID in the
+    URL would let anyone fetch anyone's signature."""
+    db = SessionLocal()
+    try:
+        signature = _active_signature(db, get_user_id())
+        if not signature:
+            return "No signature saved.", 404
+        return Response(
+            signature.image_png,
+            mimetype="image/png",
+            headers={"Cache-Control": "private, no-store"},
+        )
+    finally:
+        db.close()
+
+
+@bp.route("/settings/account/signature", methods=["POST"])
+def save_signature():
+    """Saves a newly drawn signature for the signed-in user. Only the
+    person themselves can do this - the identity comes from the Easy Auth
+    headers, never from the form. Any earlier signature is kept as history
+    and marked inactive."""
+    user_oid = get_user_id()
+    if not user_oid:
+        return "Your account couldn't be identified, so a signature can't be saved.", 400
+
+    try:
+        png = decode_signature(request.form.get("signature_data"))
+    except SignatureError as e:
+        return str(e), 400
+
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        for old in (
+            db.query(UserSignature)
+            .filter(UserSignature.user_oid == user_oid, UserSignature.is_active == True)
+            .all()
+        ):
+            old.is_active = False
+            old.replaced_at = now
+
+        db.add(UserSignature(user_oid=user_oid, user_name=get_user(), image_png=png))
+        db.commit()
+        flash("Signature saved.", "success")
+        return redirect(url_for("settings.account_settings") + "#signature")
+    except Exception as e:
+        db.rollback()
+        return f"Failed to save signature: {str(e)}", 500
+    finally:
+        db.close()
+
+
+@bp.route("/settings/account/signature/remove", methods=["POST"])
+def remove_signature():
+    """Removes the user's current signature from use. The row is kept
+    (inactive) rather than deleted, so anything already signed with it
+    can still show it."""
+    user_oid = get_user_id()
+    if not user_oid:
+        return "Your account couldn't be identified.", 400
+
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        changed = 0
+        for sig in (
+            db.query(UserSignature)
+            .filter(UserSignature.user_oid == user_oid, UserSignature.is_active == True)
+            .all()
+        ):
+            sig.is_active = False
+            sig.replaced_at = now
+            changed += 1
+        db.commit()
+        flash("Signature removed." if changed else "You had no signature saved.", "success")
+        return redirect(url_for("settings.account_settings") + "#signature")
+    except Exception as e:
+        db.rollback()
+        return f"Failed to remove signature: {str(e)}", 500
     finally:
         db.close()

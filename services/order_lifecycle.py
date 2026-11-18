@@ -1,11 +1,16 @@
 """
 order_lifecycle.py
 =====================================================================
-The four milestones from the paper order form's "Section For Office
-Use Only":
+The milestones from the paper order form's "Section For Office Use
+Only", plus the shipping steps between placing and receiving:
 
-    Received order form -> Order placed -> Order received -> Order
-    distributed
+    Received order form -> Order placed -> Arrived at main office ->
+    In transit (main office to site) -> [Partially delivered] -> Order
+    received -> Order distributed
+
+"Partially delivered" is not marked by hand. It is stamped by the
+receiving flow the first time a delivery to the site leaves items
+outstanding, and it only appears on the track once that has happened.
 
 Each is a date on the form, so each is a date here too. The current
 STAGE is derived from which of them are filled in rather than being
@@ -24,6 +29,9 @@ Pure and DB-independent so the ordering rules are unit testable.
 STAGE_SUBMITTED = "SUBMITTED"
 STAGE_FORM_RECEIVED = "FORM_RECEIVED"
 STAGE_PLACED = "PLACED"
+STAGE_IN_TRANSIT = "IN_TRANSIT"
+STAGE_MAIN_OFFICE = "MAIN_OFFICE"
+STAGE_PARTIAL = "PARTIAL_DELIVERY"
 STAGE_RECEIVED = "RECEIVED"
 STAGE_DISTRIBUTED = "DISTRIBUTED"
 STAGE_CANCELLED = "CANCELLED"
@@ -34,6 +42,9 @@ STAGE_SEQUENCE = [
     (STAGE_SUBMITTED, None),
     (STAGE_FORM_RECEIVED, "form_received_at"),
     (STAGE_PLACED, "order_placed_at"),
+    (STAGE_MAIN_OFFICE, "arrived_main_office_at"),
+    (STAGE_IN_TRANSIT, "in_transit_at"),
+    (STAGE_PARTIAL, "partially_delivered_at"),
     (STAGE_RECEIVED, "order_received_at"),
     (STAGE_DISTRIBUTED, "order_distributed_at"),
 ]
@@ -42,14 +53,28 @@ STAGE_LABELS = {
     STAGE_SUBMITTED: "Submitted",
     STAGE_FORM_RECEIVED: "Order form received",
     STAGE_PLACED: "Order placed",
+    STAGE_MAIN_OFFICE: "Arrived at main office",
+    STAGE_IN_TRANSIT: "In transit",
+    STAGE_PARTIAL: "Partially delivered",
     STAGE_RECEIVED: "Order received",
     STAGE_DISTRIBUTED: "Order distributed",
     STAGE_CANCELLED: "Cancelled",
 }
 
-# Stages a person advances by hand. "Order received" is excluded
-# deliberately - it follows from the line items, not from a button.
-MANUAL_STAGES = [STAGE_FORM_RECEIVED, STAGE_PLACED, STAGE_DISTRIBUTED]
+# Stages a person advances by hand. "Order received" and "Partially
+# delivered" are excluded deliberately - they follow from the line
+# items, not from a button.
+MANUAL_STAGES = [STAGE_FORM_RECEIVED, STAGE_PLACED, STAGE_MAIN_OFFICE,
+                 STAGE_IN_TRANSIT, STAGE_DISTRIBUTED]
+
+# Which "who did it" column goes with each hand-marked stage.
+STAGE_BY_FIELDS = {
+    STAGE_FORM_RECEIVED: "form_received_by",
+    STAGE_PLACED: "order_placed_by",
+    STAGE_MAIN_OFFICE: "arrived_main_office_by",
+    STAGE_IN_TRANSIT: "in_transit_by",
+    STAGE_DISTRIBUTED: "order_distributed_by",
+}
 
 STAGE_FIELDS = {stage: field for stage, field in STAGE_SEQUENCE if field}
 
@@ -81,7 +106,7 @@ def can_advance_to(batch, stage, all_lines_received=False):
     Rules:
       - a cancelled order advances nowhere;
       - a milestone already marked can't be marked twice;
-      - "order received" is never marked by hand;
+      - "order received" and "partially delivered" are never marked by hand;
       - "order distributed" requires the goods to have actually
         arrived, since you can't hand out what you haven't got.
     Earlier milestones are deliberately NOT enforced as prerequisites -
@@ -100,9 +125,10 @@ def can_advance_to(batch, stage, all_lines_received=False):
 
 
 def timeline(batch):
-    """The four milestones with their dates, for display. Always returns
-    all four so the UI can show what's still outstanding, not just what's
-    done."""
+    """The milestones with their dates, for display. Shows what's still
+    outstanding as well as what's done. "Partially delivered" is the one
+    exception: it is listed only once it has actually happened, because
+    most orders never go through it."""
     return [
         {
             "stage": stage,
@@ -112,7 +138,7 @@ def timeline(batch):
             "done": bool(getattr(batch, field, None)),
         }
         for stage, field in STAGE_SEQUENCE
-        if field
+        if field and (stage != STAGE_PARTIAL or getattr(batch, field, None))
     ]
 
 

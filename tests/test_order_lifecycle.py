@@ -15,6 +15,9 @@ from services.order_lifecycle import (
     STAGE_CANCELLED,
     STAGE_DISTRIBUTED,
     STAGE_FORM_RECEIVED,
+    STAGE_IN_TRANSIT,
+    STAGE_MAIN_OFFICE,
+    STAGE_PARTIAL,
     STAGE_PLACED,
     STAGE_RECEIVED,
     STAGE_SUBMITTED,
@@ -33,6 +36,9 @@ class _Batch:
         self.status = "OPEN"
         self.form_received_at = None
         self.order_placed_at = None
+        self.in_transit_at = None
+        self.arrived_main_office_at = None
+        self.partially_delivered_at = None
         self.order_received_at = None
         self.order_distributed_at = None
         for k, v in kwargs.items():
@@ -115,8 +121,55 @@ def test_earlier_milestones_are_not_prerequisites():
 
 # ---- timeline -----------------------------------------------------------
 
-def test_timeline_always_lists_all_four_milestones():
-    assert len(timeline(_Batch())) == 4
+def test_timeline_lists_every_step_except_partial_until_it_happens():
+    """Six steps on a fresh order. "Partially delivered" is left out
+    because most orders never go through it."""
+    labels = [s["stage"] for s in timeline(_Batch())]
+    assert len(labels) == 6
+    assert STAGE_PARTIAL not in labels
+    assert STAGE_IN_TRANSIT in labels and STAGE_MAIN_OFFICE in labels
+
+
+def test_timeline_includes_partial_once_it_has_happened():
+    labels = [s["stage"] for s in timeline(_Batch(partially_delivered_at=NOW))]
+    assert len(labels) == 7
+    # and it sits between "in transit" and "order received"
+    assert labels.index(STAGE_IN_TRANSIT) < labels.index(STAGE_PARTIAL) < labels.index(STAGE_RECEIVED)
+
+
+# ---- shipping steps -----------------------------------------------------
+
+def test_shipping_steps_follow_placed_and_precede_received():
+    """Goods land at the main office first, then go in transit to the site."""
+    assert current_stage(_Batch(order_placed_at=NOW, arrived_main_office_at=NOW)) == STAGE_MAIN_OFFICE
+    assert current_stage(
+        _Batch(order_placed_at=NOW, arrived_main_office_at=NOW, in_transit_at=NOW)
+    ) == STAGE_IN_TRANSIT
+
+
+def test_main_office_comes_before_in_transit_on_the_timeline():
+    labels = [s["stage"] for s in timeline(_Batch())]
+    assert labels.index(STAGE_PLACED) < labels.index(STAGE_MAIN_OFFICE) < labels.index(STAGE_IN_TRANSIT) < labels.index(STAGE_RECEIVED)
+
+
+def test_partial_delivery_stage_sits_between_in_transit_and_received():
+    batch = _Batch(arrived_main_office_at=NOW, in_transit_at=NOW, partially_delivered_at=NOW)
+    assert current_stage(batch) == STAGE_PARTIAL
+    batch.order_received_at = NOW
+    assert current_stage(batch) == STAGE_RECEIVED
+
+
+def test_in_transit_and_main_office_are_manual_but_partial_is_not():
+    assert STAGE_IN_TRANSIT in MANUAL_STAGES
+    assert STAGE_MAIN_OFFICE in MANUAL_STAGES
+    assert STAGE_PARTIAL not in MANUAL_STAGES
+    assert can_advance_to(_Batch(), STAGE_PARTIAL, all_lines_received=True) is False
+
+
+def test_every_manual_stage_has_a_by_column():
+    from services.order_lifecycle import STAGE_BY_FIELDS
+    for stage in MANUAL_STAGES:
+        assert stage in STAGE_BY_FIELDS
 
 
 def test_timeline_marks_which_are_done():

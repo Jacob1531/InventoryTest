@@ -11,7 +11,7 @@ their location moved. Endpoint names are now namespaced as
 from flask import Blueprint, current_app, render_template
 from sqlalchemy import text
 from db import SessionLocal, engine
-from models import (DashboardPreference, FileSubmission, HardwareDocument, HardwareItem,
+from models import (DashboardPreference, UserSignature, FileSubmission, HardwareDocument, HardwareItem,
                     HardwareNote, Inventory, InventoryAudit, InventoryOrder, OrderBatch,
                     WarrantyNotification)
 from services.chart_data import build_chart, DEFAULT_LIMIT, DEFAULT_MODE
@@ -248,3 +248,31 @@ def favicon():
 #             conn.execute(text(stmt))
 #         conn.commit()
 #     return f"Added {len(statements)} order-form columns (or they already existed) - remove this route now."
+
+
+# ONE-TIME MIGRATION - visit this URL once to add the shipping-step dates
+# (in transit, arrived at main office, partially delivered) to order_batch.
+# Then DELETE or comment out this route. Additive only - existing orders
+# keep NULLs and behave exactly as before.
+@bp.route("/add-order-shipping-steps-once")
+def add_order_shipping_steps_once():
+    statements = [
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS in_transit_at TIMESTAMP",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS arrived_main_office_at TIMESTAMP",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS partially_delivered_at TIMESTAMP",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS in_transit_by VARCHAR",
+        "ALTER TABLE order_batch ADD COLUMN IF NOT EXISTS arrived_main_office_by VARCHAR",
+    ]
+    with engine.connect() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.commit()
+    return f"Added {len(statements)} order shipping-step columns (or they already existed) - remove this route now."
+
+
+# ONE-TIME MIGRATION - visit this URL once to create the table that holds
+# users' hand-drawn e-signatures. Then DELETE or comment out this route.
+@bp.route("/create-user-signatures-once")
+def create_user_signatures_once():
+    UserSignature.__table__.create(bind=engine, checkfirst=True)
+    return "user_signature table created (or already existed) - remove this route now."

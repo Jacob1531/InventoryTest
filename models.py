@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Date, Index
+from sqlalchemy import (Boolean, Column, Date, DateTime, Index, Integer, LargeBinary, Numeric,
+                        String)
 from sqlalchemy.sql import func
 from db import Base
 
@@ -86,10 +87,17 @@ class OrderBatch(Base):
     # derivable from which of them are filled in.
     form_received_at = Column(DateTime, nullable=True)
     order_placed_at = Column(DateTime, nullable=True)
+    # Shipping steps between placing and receiving. "Partially delivered"
+    # is stamped automatically by the receiving flow, not by hand.
+    in_transit_at = Column(DateTime, nullable=True)
+    arrived_main_office_at = Column(DateTime, nullable=True)
+    partially_delivered_at = Column(DateTime, nullable=True)
     order_received_at = Column(DateTime, nullable=True)
     order_distributed_at = Column(DateTime, nullable=True)
     form_received_by = Column(String, nullable=True)
     order_placed_by = Column(String, nullable=True)
+    in_transit_by = Column(String, nullable=True)
+    arrived_main_office_by = Column(String, nullable=True)
     order_distributed_by = Column(String, nullable=True)
 
 
@@ -243,4 +251,31 @@ class WarrantyNotification(Base):
 
     __table_args__ = (
         Index("ix_warranty_notification_lookup", "hardware_id", "milestone", "warranty_expires"),
+    )
+
+
+class UserSignature(Base):
+    """A user's hand-drawn e-signature, created in Account Settings.
+
+    Keyed by the Entra object ID (the 'oid' claim) rather than the
+    sign-in name, because the ID never changes even if someone's email
+    or display name does.
+
+    Saving a new signature doesn't overwrite the old row; it marks it
+    inactive and adds a new one. That keeps a history, and it means a
+    future delivery-verification record can point at the exact
+    signature that was used even after the person redraws theirs.
+    The image itself is a small PNG with a transparent background."""
+    __tablename__ = "user_signature"
+
+    id = Column(Integer, primary_key=True)
+    user_oid = Column(String, nullable=False, index=True)
+    user_name = Column(String)                 # sign-in name at the time, for display
+    image_png = Column(LargeBinary, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    replaced_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_user_signature_oid_active", "user_oid", "is_active"),
     )

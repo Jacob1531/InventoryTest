@@ -2169,6 +2169,10 @@ input[type="number"].has-error {
 .badge-submitted      { background-color: var(--surface-muted); color: var(--text-muted); }
 .badge-form_received  { background-color: var(--info-bg); color: var(--info); }
 .badge-placed         { background-color: var(--info-bg); color: var(--info); }
+.badge-in_transit     { background-color: var(--info-bg); color: var(--info); }
+.badge-main_office    { background-color: var(--info-bg); color: var(--info); }
+.badge-partial_delivery { background-color: #fffbeb; color: #b45309; }
+[data-theme="dark"] .badge-partial_delivery { background-color: rgba(245, 158, 11, 0.16); color: #fbbf24; }
 .badge-distributed    { background-color: var(--success-bg); color: var(--success); }
 
 /* Row the user arrived at from an item's order button - highlighted so it
@@ -2179,4 +2183,84 @@ input[type="number"].has-error {
 
 .is-preselected td:first-child {
     box-shadow: inset 3px 0 0 var(--brand);
+}
+
+
+/* ==========================================================================
+   E-signature pad (Account Settings)
+   --------------------------------------------------------------------------
+   The pad is always white with dark ink, even in dark mode, because the
+   saved PNG is meant to look like ink on paper wherever it's shown later.
+   ========================================================================== */
+.signature-pad-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    height: 200px;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    background: #ffffff;
+    margin-bottom: 4px;
+    overflow: hidden;
+}
+
+.signature-pad {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    touch-action: none;   /* stop the page scrolling while drawing on touch screens */
+    cursor: crosshair;
+    z-index: 2;
+}
+
+.signature-baseline {
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    bottom: 48px;
+    border-bottom: 1px solid #cbd5e1;
+    z-index: 1;
+}
+
+.signature-placeholder {
+    position: absolute;
+    left: 28px;
+    bottom: 54px;
+    font-size: 14px;
+    color: #94a3b8;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.signature-placeholder.is-hidden {
+    display: none;
+}
+
+.signature-preview {
+    display: inline-block;
+    max-width: 100%;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 8px 16px;
+    margin: 6px 0;
+}
+
+.signature-preview img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    max-height: 120px;
+}
+
+.signature-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.signature-actions form {
+    margin: 0;
 }

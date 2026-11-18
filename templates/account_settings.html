@@ -43,6 +43,52 @@
     </div>
 </div>
 
+<div class="panel" id="signature" style="margin-bottom:28px;">
+    <h2>My Signature</h2>
+    <p class="panel-subtitle">Draw your signature with your mouse, finger, or stylus. It will be used when you verify that a delivery has arrived on site. Only you can create or change it.</p>
+
+    {% if not can_sign %}
+    <p class="form-error-banner">Your account couldn't be identified, so a signature can't be saved right now. Try signing out and back in.</p>
+    {% else %}
+
+    {% if has_signature %}
+    <div class="signature-current" id="signatureCurrent">
+        <div class="field-label">Current signature</div>
+        <div class="signature-preview">
+            <img src="{{ url_for('settings.my_signature_image') }}?v={{ signature_version }}" alt="Your saved signature">
+        </div>
+        <div class="field-hint">Saved {{ signature_saved_display }}</div>
+        <div class="form-actions signature-actions">
+            <button type="button" class="btn btn-secondary" id="signatureRedrawBtn">Draw a New Signature</button>
+            <form method="POST" action="{{ url_for('settings.remove_signature') }}"
+                  data-confirm="Remove your signature? You'll need to draw a new one before you can verify deliveries."
+                  onsubmit="return confirm(this.dataset.confirm);">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger-outline">Remove</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="signature-editor" id="signatureEditor" data-save-url="{{ url_for('settings.save_signature') }}" {% if has_signature %}hidden{% endif %}>
+        <p id="signatureError" class="form-error-banner" style="display:none;"></p>
+        <div class="signature-pad-wrap">
+            <canvas id="signaturePad" class="signature-pad" aria-label="Signature drawing area"></canvas>
+            <div class="signature-baseline" aria-hidden="true"></div>
+            <div class="signature-placeholder" id="signaturePlaceholder" aria-hidden="true">Sign here</div>
+        </div>
+        <div class="form-actions signature-actions">
+            <button type="button" class="btn btn-secondary" id="signatureClearBtn">Clear</button>
+            {% if has_signature %}<button type="button" class="btn btn-secondary" id="signatureCancelBtn">Cancel</button>{% endif %}
+            <button type="button" class="btn btn-primary" id="signatureSaveBtn" disabled>Save Signature</button>
+        </div>
+    </div>
+
+    <input type="hidden" id="signatureCsrf" value="{{ csrf_token() }}">
+    <script src="{{ url_for('static', filename='js/signature.js') }}"></script>
+    {% endif %}
+</div>
+
 <div class="panel" id="dashboard-chart" style="margin-bottom:28px;">
     <h2>Dashboard Chart</h2>
     <p class="panel-subtitle">Choose what the chart on your dashboard shows. This is your own setting &mdash; it doesn't affect anyone else.</p>

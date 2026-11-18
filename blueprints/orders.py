@@ -20,7 +20,8 @@ from services.file_handler import (is_allowed_submission_filename, generate_file
                                    upload_submission_file)
 from services.receiving import (OPEN_STATUSES, apply_receipt, batch_status_from_lines,
                                 outstanding, summarize_batch)
-from services.order_lifecycle import (MANUAL_STAGES, STAGE_FIELDS, STAGE_LABELS,
+from services.order_lifecycle import (MANUAL_STAGES, STAGE_BY_FIELDS, STAGE_FIELDS,
+                                      STAGE_LABELS,
                                       can_advance_to, current_stage, line_total,
                                       order_total, timeline)
 from auth import get_user
@@ -325,11 +326,7 @@ def advance_batch_stage(batch_id):
         setattr(batch, STAGE_FIELDS[stage], now)
 
         # Record who marked it, where the form has a signature line.
-        by_field = {
-            "FORM_RECEIVED": "form_received_by",
-            "PLACED": "order_placed_by",
-            "DISTRIBUTED": "order_distributed_by",
-        }.get(stage)
+        by_field = STAGE_BY_FIELDS.get(stage)
         if by_field:
             setattr(batch, by_field, get_user())
 
@@ -439,6 +436,12 @@ def receive_batch(batch_id):
         # exactly when the last outstanding line does.
         if batch.status == "RECEIVED" and not batch.order_received_at:
             batch.order_received_at = now
+
+        # "Partially delivered" is derived the same way: the first time a
+        # delivery lands and items are still outstanding.
+        if batch.status != "RECEIVED" and not batch.partially_delivered_at:
+            if any(l.status in OPEN_STATUSES for l in lines):
+                batch.partially_delivered_at = receipt_time
 
         if has_doc:
             blob_path = upload_submission_file(doc_file, prefix="files")
